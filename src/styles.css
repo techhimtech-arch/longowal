@@ -59,6 +59,31 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* CMD Dashboard tokens */
+  --color-surface: var(--surface);
+  --color-on-surface: var(--on-surface);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-secondary-container: var(--secondary-container);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-error-container: var(--error-container);
+  --color-error: var(--error);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-tertiary: var(--tertiary);
+  --color-primary-fixed: var(--primary-fixed);
+  --color-secondary-fixed: var(--secondary-fixed);
+  --color-tertiary-fixed: var(--tertiary-fixed);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-wireframe-border: var(--wireframe-border);
+  --color-wireframe-bg-alt: var(--wireframe-bg-alt);
+  --color-status-success: var(--status-success);
+  --color-status-warning: var(--status-warning);
+  --spacing-gutter: 1.5rem;
 }
 
 :root {
@@ -95,6 +120,33 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+  /* CMD Dashboard semantic tokens */
+  --primary: #00288e;
+  --primary-foreground: #ffffff;
+  --on-primary: #ffffff;
+  --surface: #ffffff;
+  --on-surface: #14181f;
+  --secondary: #4a5566;
+  --tertiary: #6b5a8a;
+  --primary-container: #c5d1ff;
+  --secondary-container: #d8dee9;
+  --tertiary-container: #e0d5f0;
+  --error: #b3261e;
+  --error-container: #f9dedc;
+  --outline: #79747e;
+  --outline-variant: #e5e7eb;
+  --primary-fixed: #c5d1ff;
+  --secondary-fixed: #d8dee9;
+  --tertiary-fixed: #e0d5f0;
+  --surface-container: #f3f4f7;
+  --surface-container-low: #f7f8fa;
+  --surface-container-lowest: #fbfbfd;
+  --surface-container-high: #ebedf1;
+  --surface-container-highest: #e3e6eb;
+  --wireframe-border: #d9dde4;
+  --wireframe-bg-alt: #f6f7f9;
+  --status-success: #2e7d32;
+  --status-warning: #ed6c02;
 }
 
 .dark {
@@ -140,5 +192,41 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: "Inter", system-ui, sans-serif;
   }
+}
+
+@utility font-headline-lg { font-weight: 600; letter-spacing: -0.02em; }
+@utility font-headline-md { font-weight: 600; letter-spacing: -0.01em; }
+@utility font-headline-sm { font-weight: 600; }
+@utility font-label-md { font-weight: 500; }
+@utility font-label-sm { font-weight: 500; }
+@utility font-body-md { font-weight: 400; }
+@utility text-headline-lg { font-size: 1.875rem; line-height: 2.25rem; }
+@utility text-headline-md { font-size: 1.5rem; line-height: 2rem; }
+@utility text-headline-sm { font-size: 1.125rem; line-height: 1.5rem; }
+@utility text-label-md { font-size: 0.8125rem; line-height: 1.125rem; }
+@utility text-label-sm { font-size: 0.6875rem; line-height: 1rem; }
+@utility text-body-md { font-size: 0.875rem; line-height: 1.25rem; }
+
+.chart-bar {
+  border-radius: 4px 4px 0 0;
+  transition: opacity 0.2s;
+}
+.chart-bar:hover { opacity: 0.85; }
+
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
 }
