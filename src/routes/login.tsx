@@ -1,5 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -11,25 +15,67 @@ export const Route = createFileRoute("/login")({
   component: Login,
 });
 
+const loginSchema = z.object({
+  email: z.string().email({ message: "Invalid email address" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  rememberMe: z.boolean().optional(),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
 function Login() {
   const [showPassword, setShowPassword] = useState(false);
+  const { login, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      rememberMe: false,
+    },
+  });
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      navigate({ to: "/", replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
 
   const togglePassword = () => {
     setShowPassword(!showPassword);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real app, handle authentication here
-    window.location.reload();
+  const onSubmit = async (data: LoginFormValues) => {
+    // In a real app, handle API authentication here
+    // For now, mock a successful login based on email
+    let role: "Admin" | "Sales Executive" | "Operations" | "Accounts" = "Admin";
+    
+    if (data.email.includes("sales")) role = "Sales Executive";
+    if (data.email.includes("ops")) role = "Operations";
+    if (data.email.includes("account")) role = "Accounts";
+
+    login({
+      id: "usr-" + Date.now(),
+      name: data.email.split("@")[0],
+      email: data.email,
+      role: role
+    });
+    
+    navigate({ to: "/", replace: true });
   };
+
+  if (isLoading) return null;
 
   return (
     <div className="bg-wireframe-bg-alt flex items-center justify-center min-h-screen">
-      {/* Login Container */}
       <div className="w-full max-w-[440px] px-margin-sm animate-in fade-in duration-700">
         
-        {/* Logo & Branding */}
         <div className="text-center mb-margin-lg">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-lg bg-white border border-wireframe-border shadow-sm mb-4">
             <span className="material-symbols-outlined text-primary text-[40px]" data-icon="local_shipping">local_shipping</span>
@@ -38,7 +84,6 @@ function Login() {
           <p className="font-label-md text-label-md text-secondary tracking-widest uppercase mt-1">Enterprise OOMS</p>
         </div>
 
-        {/* Auth Card */}
         <div className="bg-white border border-wireframe-border rounded-lg shadow-[0px_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
           <div className="p-margin-lg">
             <div className="mb-margin-md">
@@ -46,52 +91,74 @@ function Login() {
               <p className="font-body-md text-body-md text-on-surface-variant">Log in to manage your logistics pipeline.</p>
             </div>
 
-            <form className="space-y-gutter" id="loginForm" onSubmit={handleLogin}>
+            <form className="space-y-gutter" onSubmit={handleSubmit(onSubmit)}>
               {/* Email / Username */}
-              <div className="space-y-base group/input">
-                <label className="block font-label-md text-label-md text-on-surface group-focus-within/input:text-primary transition-colors" htmlFor="identity">Email / Username</label>
+              <div className="space-y-1 group/input">
+                <label className="block font-label-md text-label-md text-on-surface group-focus-within/input:text-primary transition-colors" htmlFor="email">Email</label>
                 <div className="relative">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]" data-icon="person">person</span>
-                  <input className="w-full pl-10 pr-4 py-3 border border-wireframe-border rounded font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-surface-bright" id="identity" placeholder="Enter your credentials" type="text" />
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">person</span>
+                  <input 
+                    className={`w-full pl-10 pr-4 py-3 border ${errors.email ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-wireframe-border focus:ring-primary focus:border-primary'} rounded font-body-md text-body-md focus:outline-none focus:ring-2 transition-all bg-surface-bright`} 
+                    id="email" 
+                    placeholder="Enter your email (e.g. admin@test.com)" 
+                    type="email"
+                    {...register("email")}
+                  />
                 </div>
+                {errors.email && (
+                  <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>
+                )}
               </div>
 
               {/* Password */}
-              <div className="space-y-base group/input">
+              <div className="space-y-1 group/input">
                 <div className="flex justify-between items-center">
                   <label className="block font-label-md text-label-md text-on-surface group-focus-within/input:text-primary transition-colors" htmlFor="password">Password</label>
                   <a className="font-label-md text-label-md text-primary hover:underline transition-all" href="#">Forgot Password?</a>
                 </div>
                 <div className="relative">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]" data-icon="lock">lock</span>
-                  <input className="w-full pl-10 pr-12 py-3 border border-wireframe-border rounded font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-surface-bright" id="password" placeholder="••••••••" type={showPassword ? "text" : "password"} />
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">lock</span>
+                  <input 
+                    className={`w-full pl-10 pr-12 py-3 border ${errors.password ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-wireframe-border focus:ring-primary focus:border-primary'} rounded font-body-md text-body-md focus:outline-none focus:ring-2 transition-all bg-surface-bright`} 
+                    id="password" 
+                    placeholder="••••••••" 
+                    type={showPassword ? "text" : "password"}
+                    {...register("password")}
+                  />
                   <button className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors" onClick={togglePassword} type="button">
-                    <span className="material-symbols-outlined text-[20px]" data-icon={showPassword ? "visibility_off" : "visibility"}>{showPassword ? "visibility_off" : "visibility"}</span>
+                    <span className="material-symbols-outlined text-[20px]">{showPassword ? "visibility_off" : "visibility"}</span>
                   </button>
                 </div>
+                {errors.password && (
+                  <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>
+                )}
               </div>
 
               {/* Remember Me & Reset Link Cluster */}
               <div className="flex items-center justify-between py-2">
                 <label className="flex items-center cursor-pointer group">
                   <div className="relative">
-                    <input className="peer sr-only" type="checkbox" />
-                    <div className="w-5 h-5 border-2 border-wireframe-border rounded bg-white peer-checked:bg-primary peer-checked:border-primary transition-all"></div>
-                    <span className="material-symbols-outlined absolute top-0 left-0 text-[18px] text-white hidden peer-checked:block" data-icon="check">check</span>
+                    <input className="peer sr-only" type="checkbox" {...register("rememberMe")} />
+                    <div className="w-5 h-5 border-2 border-wireframe-border rounded bg-white peer-checked:bg-primary peer-checked:border-primary transition-all flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[16px] text-white hidden peer-checked:block">check</span>
+                    </div>
                   </div>
                   <span className="ml-2 font-body-md text-body-md text-on-surface-variant group-hover:text-on-surface transition-colors">Remember Me</span>
                 </label>
               </div>
 
               {/* Action: Login */}
-              <button className="w-full bg-primary text-white font-label-md text-label-md py-4 rounded-lg shadow-sm hover:bg-on-primary-fixed-variant active:scale-[0.98] transition-all flex items-center justify-center gap-2" type="submit">
-                LOGIN
-                <span className="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
+              <button 
+                className="w-full bg-primary text-white font-label-md text-label-md py-4 rounded-lg shadow-sm hover:bg-on-primary-fixed-variant active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed" 
+                type="submit"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "LOGGING IN..." : "LOGIN"}
+                {!isSubmitting && <span className="material-symbols-outlined text-[18px]">arrow_forward</span>}
               </button>
             </form>
           </div>
 
-          {/* Footer / Secondary Actions */}
           <div className="bg-wireframe-bg-alt border-t border-wireframe-border p-margin-md text-center">
             <p className="font-body-md text-body-md text-on-surface-variant">
               Having trouble logging in? <br/>
@@ -100,7 +167,6 @@ function Login() {
           </div>
         </div>
 
-        {/* System Status Footer */}
         <div className="mt-margin-lg text-center">
           <div className="flex items-center justify-center gap-2 text-outline mb-2">
             <div className="w-2 h-2 rounded-full bg-status-success animate-pulse"></div>
