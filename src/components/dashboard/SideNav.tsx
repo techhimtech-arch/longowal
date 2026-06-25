@@ -1,12 +1,13 @@
+import { Link } from "@tanstack/react-router";
+
 const items = [
-  { icon: "dashboard", label: "Dashboard", active: true },
-  { icon: "trending_up", label: "Sales" },
-  { icon: "shopping_bag", label: "Orders" },
-  { icon: "groups", label: "Customers" },
-  { icon: "account_balance_wallet", label: "Collections" },
-  { icon: "inventory_2", label: "Inventory" },
-  { icon: "assessment", label: "Reports" },
-  { icon: "settings", label: "Settings" },
+  { icon: "dashboard", label: "Dashboard", path: "/" },
+  { icon: "groups", label: "Leads", path: "/leads" },
+  { icon: "shopping_bag", label: "Orders", path: "/orders" },
+  { icon: "group", label: "Users", path: "/users" },
+  { icon: "account_balance_wallet", label: "Collections", path: "/collections" },
+  { icon: "assessment", label: "Reports", path: "/reports" },
+  { icon: "settings", label: "Settings", path: "/settings" },
 ];
 
 export function SideNav() {
@@ -26,17 +27,20 @@ export function SideNav() {
           Main
         </p>
         {items.map((it) => (
-          <button
+          <Link
             key={it.label}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded text-left font-label-md text-label-md transition-colors ${
-              it.active
-                ? "bg-primary-container/40 text-primary font-semibold"
-                : "text-secondary hover:bg-wireframe-bg-alt"
-            }`}
+            to={it.path}
+            activeProps={{
+              className: "bg-primary-container/40 text-primary font-semibold"
+            }}
+            inactiveProps={{
+              className: "text-secondary hover:bg-wireframe-bg-alt"
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded text-left font-label-md text-label-md transition-colors`}
           >
             <span className="material-symbols-outlined text-[20px]">{it.icon}</span>
             <span>{it.label}</span>
-          </button>
+          </Link>
         ))}
       </nav>
       <div className="p-4 border-t border-wireframe-border flex items-center gap-3">

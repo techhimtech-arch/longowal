@@ -10,42 +10,178 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as LayoutRouteImport } from './routes/_layout'
+import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
+import { Route as LayoutUsersIndexRouteImport } from './routes/_layout/users/index'
+import { Route as LayoutRolesIndexRouteImport } from './routes/_layout/roles/index'
+import { Route as LayoutOrdersIndexRouteImport } from './routes/_layout/orders/index'
+import { Route as LayoutLeadsIndexRouteImport } from './routes/_layout/leads/index'
+import { Route as LayoutUsersNewRouteImport } from './routes/_layout/users/new'
+import { Route as LayoutOrdersNewRouteImport } from './routes/_layout/orders/new'
+import { Route as LayoutLeadsNewRouteImport } from './routes/_layout/leads/new'
+import { Route as LayoutOrdersOrderIdIndexRouteImport } from './routes/_layout/orders/$orderId/index'
+import { Route as LayoutLeadsLeadIdIndexRouteImport } from './routes/_layout/leads/$leadId/index'
+import { Route as LayoutLeadsLeadIdFollowupRouteImport } from './routes/_layout/leads/$leadId/followup'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LayoutRoute = LayoutRouteImport.update({
+  id: '/_layout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LayoutIndexRoute = LayoutIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutUsersIndexRoute = LayoutUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutRolesIndexRoute = LayoutRolesIndexRouteImport.update({
+  id: '/roles/',
+  path: '/roles/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutOrdersIndexRoute = LayoutOrdersIndexRouteImport.update({
+  id: '/orders/',
+  path: '/orders/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutLeadsIndexRoute = LayoutLeadsIndexRouteImport.update({
+  id: '/leads/',
+  path: '/leads/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutUsersNewRoute = LayoutUsersNewRouteImport.update({
+  id: '/users/new',
+  path: '/users/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutOrdersNewRoute = LayoutOrdersNewRouteImport.update({
+  id: '/orders/new',
+  path: '/orders/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutLeadsNewRoute = LayoutLeadsNewRouteImport.update({
+  id: '/leads/new',
+  path: '/leads/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutOrdersOrderIdIndexRoute =
+  LayoutOrdersOrderIdIndexRouteImport.update({
+    id: '/orders/$orderId/',
+    path: '/orders/$orderId/',
+    getParentRoute: () => LayoutRoute,
+  } as any)
+const LayoutLeadsLeadIdIndexRoute = LayoutLeadsLeadIdIndexRouteImport.update({
+  id: '/leads/$leadId/',
+  path: '/leads/$leadId/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutLeadsLeadIdFollowupRoute =
+  LayoutLeadsLeadIdFollowupRouteImport.update({
+    id: '/leads/$leadId/followup',
+    path: '/leads/$leadId/followup',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof LayoutIndexRoute
   '/login': typeof LoginRoute
+  '/leads/new': typeof LayoutLeadsNewRoute
+  '/orders/new': typeof LayoutOrdersNewRoute
+  '/users/new': typeof LayoutUsersNewRoute
+  '/leads/': typeof LayoutLeadsIndexRoute
+  '/orders/': typeof LayoutOrdersIndexRoute
+  '/roles/': typeof LayoutRolesIndexRoute
+  '/users/': typeof LayoutUsersIndexRoute
+  '/leads/$leadId/followup': typeof LayoutLeadsLeadIdFollowupRoute
+  '/leads/$leadId/': typeof LayoutLeadsLeadIdIndexRoute
+  '/orders/$orderId/': typeof LayoutOrdersOrderIdIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/': typeof LayoutIndexRoute
+  '/leads/new': typeof LayoutLeadsNewRoute
+  '/orders/new': typeof LayoutOrdersNewRoute
+  '/users/new': typeof LayoutUsersNewRoute
+  '/leads': typeof LayoutLeadsIndexRoute
+  '/orders': typeof LayoutOrdersIndexRoute
+  '/roles': typeof LayoutRolesIndexRoute
+  '/users': typeof LayoutUsersIndexRoute
+  '/leads/$leadId/followup': typeof LayoutLeadsLeadIdFollowupRoute
+  '/leads/$leadId': typeof LayoutLeadsLeadIdIndexRoute
+  '/orders/$orderId': typeof LayoutOrdersOrderIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_layout': typeof LayoutRouteWithChildren
   '/login': typeof LoginRoute
+  '/_layout/': typeof LayoutIndexRoute
+  '/_layout/leads/new': typeof LayoutLeadsNewRoute
+  '/_layout/orders/new': typeof LayoutOrdersNewRoute
+  '/_layout/users/new': typeof LayoutUsersNewRoute
+  '/_layout/leads/': typeof LayoutLeadsIndexRoute
+  '/_layout/orders/': typeof LayoutOrdersIndexRoute
+  '/_layout/roles/': typeof LayoutRolesIndexRoute
+  '/_layout/users/': typeof LayoutUsersIndexRoute
+  '/_layout/leads/$leadId/followup': typeof LayoutLeadsLeadIdFollowupRoute
+  '/_layout/leads/$leadId/': typeof LayoutLeadsLeadIdIndexRoute
+  '/_layout/orders/$orderId/': typeof LayoutOrdersOrderIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/leads/new'
+    | '/orders/new'
+    | '/users/new'
+    | '/leads/'
+    | '/orders/'
+    | '/roles/'
+    | '/users/'
+    | '/leads/$leadId/followup'
+    | '/leads/$leadId/'
+    | '/orders/$orderId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login'
-  id: '__root__' | '/' | '/login'
+  to:
+    | '/login'
+    | '/'
+    | '/leads/new'
+    | '/orders/new'
+    | '/users/new'
+    | '/leads'
+    | '/orders'
+    | '/roles'
+    | '/users'
+    | '/leads/$leadId/followup'
+    | '/leads/$leadId'
+    | '/orders/$orderId'
+  id:
+    | '__root__'
+    | '/_layout'
+    | '/login'
+    | '/_layout/'
+    | '/_layout/leads/new'
+    | '/_layout/orders/new'
+    | '/_layout/users/new'
+    | '/_layout/leads/'
+    | '/_layout/orders/'
+    | '/_layout/roles/'
+    | '/_layout/users/'
+    | '/_layout/leads/$leadId/followup'
+    | '/_layout/leads/$leadId/'
+    | '/_layout/orders/$orderId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  LayoutRoute: typeof LayoutRouteWithChildren
   LoginRoute: typeof LoginRoute
 }
 
@@ -58,18 +194,126 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
+    '/_layout': {
+      id: '/_layout'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof LayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_layout/': {
+      id: '/_layout/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof LayoutIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/users/': {
+      id: '/_layout/users/'
+      path: '/users'
+      fullPath: '/users/'
+      preLoaderRoute: typeof LayoutUsersIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/roles/': {
+      id: '/_layout/roles/'
+      path: '/roles'
+      fullPath: '/roles/'
+      preLoaderRoute: typeof LayoutRolesIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/orders/': {
+      id: '/_layout/orders/'
+      path: '/orders'
+      fullPath: '/orders/'
+      preLoaderRoute: typeof LayoutOrdersIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/leads/': {
+      id: '/_layout/leads/'
+      path: '/leads'
+      fullPath: '/leads/'
+      preLoaderRoute: typeof LayoutLeadsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/users/new': {
+      id: '/_layout/users/new'
+      path: '/users/new'
+      fullPath: '/users/new'
+      preLoaderRoute: typeof LayoutUsersNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/orders/new': {
+      id: '/_layout/orders/new'
+      path: '/orders/new'
+      fullPath: '/orders/new'
+      preLoaderRoute: typeof LayoutOrdersNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/leads/new': {
+      id: '/_layout/leads/new'
+      path: '/leads/new'
+      fullPath: '/leads/new'
+      preLoaderRoute: typeof LayoutLeadsNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/orders/$orderId/': {
+      id: '/_layout/orders/$orderId/'
+      path: '/orders/$orderId'
+      fullPath: '/orders/$orderId/'
+      preLoaderRoute: typeof LayoutOrdersOrderIdIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/leads/$leadId/': {
+      id: '/_layout/leads/$leadId/'
+      path: '/leads/$leadId'
+      fullPath: '/leads/$leadId/'
+      preLoaderRoute: typeof LayoutLeadsLeadIdIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/leads/$leadId/followup': {
+      id: '/_layout/leads/$leadId/followup'
+      path: '/leads/$leadId/followup'
+      fullPath: '/leads/$leadId/followup'
+      preLoaderRoute: typeof LayoutLeadsLeadIdFollowupRouteImport
+      parentRoute: typeof LayoutRoute
     }
   }
 }
 
+interface LayoutRouteChildren {
+  LayoutIndexRoute: typeof LayoutIndexRoute
+  LayoutLeadsNewRoute: typeof LayoutLeadsNewRoute
+  LayoutOrdersNewRoute: typeof LayoutOrdersNewRoute
+  LayoutUsersNewRoute: typeof LayoutUsersNewRoute
+  LayoutLeadsIndexRoute: typeof LayoutLeadsIndexRoute
+  LayoutOrdersIndexRoute: typeof LayoutOrdersIndexRoute
+  LayoutRolesIndexRoute: typeof LayoutRolesIndexRoute
+  LayoutUsersIndexRoute: typeof LayoutUsersIndexRoute
+  LayoutLeadsLeadIdFollowupRoute: typeof LayoutLeadsLeadIdFollowupRoute
+  LayoutLeadsLeadIdIndexRoute: typeof LayoutLeadsLeadIdIndexRoute
+  LayoutOrdersOrderIdIndexRoute: typeof LayoutOrdersOrderIdIndexRoute
+}
+
+const LayoutRouteChildren: LayoutRouteChildren = {
+  LayoutIndexRoute: LayoutIndexRoute,
+  LayoutLeadsNewRoute: LayoutLeadsNewRoute,
+  LayoutOrdersNewRoute: LayoutOrdersNewRoute,
+  LayoutUsersNewRoute: LayoutUsersNewRoute,
+  LayoutLeadsIndexRoute: LayoutLeadsIndexRoute,
+  LayoutOrdersIndexRoute: LayoutOrdersIndexRoute,
+  LayoutRolesIndexRoute: LayoutRolesIndexRoute,
+  LayoutUsersIndexRoute: LayoutUsersIndexRoute,
+  LayoutLeadsLeadIdFollowupRoute: LayoutLeadsLeadIdFollowupRoute,
+  LayoutLeadsLeadIdIndexRoute: LayoutLeadsLeadIdIndexRoute,
+  LayoutOrdersOrderIdIndexRoute: LayoutOrdersOrderIdIndexRoute,
+}
+
+const LayoutRouteWithChildren =
+  LayoutRoute._addFileChildren(LayoutRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  LayoutRoute: LayoutRouteWithChildren,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport

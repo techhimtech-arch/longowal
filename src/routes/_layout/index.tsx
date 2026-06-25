@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_layout/")({
   head: () => ({
     meta: [
       { title: "CMD Dashboard — Enterprise Performance" },
@@ -16,8 +15,6 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   return (
-    <DashboardLayout>
-      <Dashboard />
-    </DashboardLayout>
+    <Dashboard />
   );
 }
