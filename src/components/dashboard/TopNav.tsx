@@ -1,11 +1,23 @@
+import { useAuth } from "@/lib/auth";
+
 export function TopNav() {
+  const { user } = useAuth();
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "US";
+
   return (
     <header className="h-16 bg-surface border-b border-wireframe-border flex items-center justify-between px-gutter sticky top-0 z-10">
       <div className="flex items-center gap-2 text-secondary">
         <span className="font-label-md text-label-md">Home</span>
         <span className="material-symbols-outlined text-[16px]">chevron_right</span>
         <span className="font-label-md text-label-md text-on-surface font-semibold">
-          CMD Dashboard
+          {user?.role || "CMD"} Dashboard
         </span>
       </div>
       <div className="flex items-center gap-3">
@@ -26,8 +38,8 @@ export function TopNav() {
         <button className="p-2 rounded hover:bg-wireframe-bg-alt">
           <span className="material-symbols-outlined text-secondary">help</span>
         </button>
-        <div className="w-9 h-9 rounded-full bg-primary-fixed flex items-center justify-center font-bold text-[12px]">
-          RK
+        <div className="w-9 h-9 rounded-full bg-primary-fixed flex items-center justify-center font-bold text-[12px] uppercase" title={user?.name || "User Profile"}>
+          {initials}
         </div>
       </div>
     </header>
