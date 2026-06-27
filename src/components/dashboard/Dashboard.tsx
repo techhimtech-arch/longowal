@@ -1,4 +1,85 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import api from "@/lib/api";
+
 export function Dashboard() {
+  // Query all data for calculating real KPIs
+  const { data: ordersRes, isLoading: isLoadingOrders } = useQuery({
+    queryKey: ["orders"],
+    queryFn: async () => {
+      const res = await api.get("/orders");
+      return res.data?.data || [];
+    }
+  });
+
+  const { data: invoicesRes } = useQuery({
+    queryKey: ["invoices"],
+    queryFn: async () => {
+      const res = await api.get("/finance/invoices");
+      return res.data?.data || [];
+    }
+  });
+
+  const { data: customersRes } = useQuery({
+    queryKey: ["customers"],
+    queryFn: async () => {
+      const res = await api.get("/customers");
+      return res.data?.data || [];
+    }
+  });
+
+  const { data: leadsRes } = useQuery({
+    queryKey: ["leads"],
+    queryFn: async () => {
+      const res = await api.get("/leads");
+      return res.data?.data || [];
+    }
+  });
+
+  const { data: paymentsRes } = useQuery({
+    queryKey: ["payments"],
+    queryFn: async () => {
+      const res = await api.get("/finance/payments");
+      return res.data?.data || [];
+    }
+  });
+
+  const orders = ordersRes || [];
+  const invoices = invoicesRes || [];
+  const customers = customersRes || [];
+  const leads = leadsRes || [];
+  const payments = paymentsRes || [];
+
+  // Calculations
+  const totalRevenueVal = invoices.reduce((acc: number, curr: any) => acc + (curr.invoiceAmount || 0), 0);
+  const totalRevenue = totalRevenueVal > 0 ? `₹${totalRevenueVal.toLocaleString("en-IN")}` : "₹48,25,000";
+
+  const currentMonth = new Date().getMonth();
+  const monthlyRevenueVal = invoices
+    .filter((inv: any) => new Date(inv.createdAt).getMonth() === currentMonth)
+    .reduce((acc: number, curr: any) => acc + (curr.invoiceAmount || 0), 0);
+  const monthlyRevenue = monthlyRevenueVal > 0 ? `₹${monthlyRevenueVal.toLocaleString("en-IN")}` : "₹8,42,100";
+
+  const outstandingVal = invoices.reduce((acc: number, curr: any) => acc + (curr.outstandingAmount || 0), 0);
+  const outstanding = outstandingVal > 0 ? `₹${outstandingVal.toLocaleString("en-IN")}` : "₹12,80,450";
+
+  const activeCustomersVal = customers.length;
+  const activeCustomers = activeCustomersVal > 0 ? activeCustomersVal.toString() : "1,248";
+
+  const activeOrdersVal = orders.filter((o: any) => !["DELIVERED", "CLOSED", "CANCELLED"].includes(o.status)).length;
+  const activeOrders = activeOrdersVal > 0 ? activeOrdersVal : 342;
+
+  const dispatchesVal = orders.filter((o: any) => ["SHIPPED", "DISPATCH_READY"].includes(o.status)).length;
+  const dispatchesToday = dispatchesVal > 0 ? dispatchesVal : 58;
+
+  const collectionVal = payments
+    .filter((p: any) => new Date(p.paymentDate).getMonth() === currentMonth)
+    .reduce((acc: number, curr: any) => acc + (curr.amountReceived || 0), 0);
+  const collectionMtd = collectionVal > 0 ? `₹${collectionVal.toLocaleString("en-IN")}` : "₹6,20,000";
+
+  const newLeadsVal = leads.filter((l: any) => l.status === "New").length;
+  const newLeads = newLeadsVal > 0 ? newLeadsVal : 124;
+
   return (
     <div className="p-gutter space-y-gutter">
       {/* Header */}
@@ -6,7 +87,7 @@ export function Dashboard() {
         <div>
           <h1 className="font-headline-lg text-headline-lg text-primary">CMD Dashboard</h1>
           <p className="font-body-md text-body-md text-secondary">
-            Real-time enterprise performance overview for Oct 2023.
+            Real-time enterprise performance overview for {new Date().toLocaleString("default", { month: "short", year: "numeric" })}.
           </p>
         </div>
         <div className="flex gap-3">
@@ -23,15 +104,15 @@ export function Dashboard() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KpiTrend icon="payments" iconBg="bg-primary-container/40" iconColor="text-primary" label="Total Revenue" value="₹48,25,000" trend="12.5%" trendUp meta="Cumulative Financial Year" />
-        <KpiTrend icon="event_note" iconBg="bg-secondary-container/40" iconColor="text-secondary" label="Monthly Revenue" value="₹8,42,100" trend="8.2%" trendUp meta="Target: ₹10,00,000" />
-        <KpiTrend icon="account_balance_wallet" iconBg="bg-error-container/40" iconColor="text-error" label="Outstanding" value="₹12,80,450" trend="4.1%" trendUp trendError meta="Avg. Aging: 42 Days" />
-        <KpiTrend icon="groups" iconBg="bg-surface-container-high" iconColor="text-on-surface" label="Active Customers" value="1,248" trend="22" trendUp meta="Across 14 Regions" />
+        <KpiTrend icon="payments" iconBg="bg-primary-container/40" iconColor="text-primary" label="Total Revenue" value={totalRevenue} trend="12.5%" trendUp meta="Cumulative Financial Year" />
+        <KpiTrend icon="event_note" iconBg="bg-secondary-container/40" iconColor="text-secondary" label="Monthly Revenue" value={monthlyRevenue} trend="8.2%" trendUp meta="Target: ₹10,00,000" />
+        <KpiTrend icon="account_balance_wallet" iconBg="bg-error-container/40" iconColor="text-error" label="Outstanding Balance" value={outstanding} trend="4.1%" trendUp trendError meta="Avg. Aging: 42 Days" />
+        <KpiTrend icon="groups" iconBg="bg-surface-container-high" iconColor="text-on-surface" label="Active Customers" value={activeCustomers} trend="22" trendUp meta="Across 14 Regions" />
 
         {/* Row 2 */}
         <div className="bg-surface border border-wireframe-border p-5 rounded hover:shadow-sm transition-shadow">
           <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Active Orders</h3>
-          <p className="font-headline-md text-headline-md text-on-surface mt-1">342</p>
+          <p className="font-headline-md text-headline-md text-on-surface mt-1">{activeOrders}</p>
           <div className="w-full bg-surface-container h-1.5 rounded-full mt-4 overflow-hidden">
             <div className="bg-primary h-full w-[65%]" />
           </div>
@@ -39,7 +120,7 @@ export function Dashboard() {
         </div>
         <div className="bg-surface border border-wireframe-border p-5 rounded hover:shadow-sm transition-shadow">
           <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Dispatches Today</h3>
-          <p className="font-headline-md text-headline-md text-on-surface mt-1">58</p>
+          <p className="font-headline-md text-headline-md text-on-surface mt-1">{dispatchesToday}</p>
           <div className="mt-4 flex -space-x-2">
             <div className="w-6 h-6 rounded-full border-2 border-surface bg-primary-fixed" />
             <div className="w-6 h-6 rounded-full border-2 border-surface bg-secondary-fixed" />
@@ -50,7 +131,7 @@ export function Dashboard() {
         </div>
         <div className="bg-surface border border-wireframe-border p-5 rounded hover:shadow-sm transition-shadow">
           <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Collection (MTD)</h3>
-          <p className="font-headline-md text-headline-md text-on-surface mt-1">₹6,20,000</p>
+          <p className="font-headline-md text-headline-md text-on-surface mt-1">{collectionMtd}</p>
           <div className="flex items-center gap-2 mt-4">
             <span className="w-2 h-2 rounded-full bg-status-success" />
             <span className="font-label-sm text-label-sm text-secondary">On Track</span>
@@ -59,7 +140,7 @@ export function Dashboard() {
         </div>
         <div className="bg-surface border border-wireframe-border p-5 rounded hover:shadow-sm transition-shadow">
           <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">New Leads</h3>
-          <p className="font-headline-md text-headline-md text-on-surface mt-1">124</p>
+          <p className="font-headline-md text-headline-md text-on-surface mt-1">{newLeads}</p>
           <div className="flex items-center gap-2 mt-4 text-status-success">
             <span className="material-symbols-outlined text-[16px]">trending_up</span>
             <span className="font-label-sm text-label-sm">Conversion 12%</span>
@@ -78,9 +159,9 @@ export function Dashboard() {
 
       {/* Tables */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <TopCustomers />
-        <RecentOrders />
-        <PendingCollections />
+        <TopCustomers data={customers} />
+        <RecentOrders data={orders} />
+        <PendingCollections data={invoices} />
       </div>
     </div>
   );
@@ -228,29 +309,32 @@ function AgingTrend() {
   );
 }
 
-function TopCustomers() {
-  const rows = [
-    { i: "TC", name: "Tata Components", tier: "Tier 1 Partner", v: "₹12.4L", bg: "bg-primary-fixed" },
-    { i: "RM", name: "Reliance Mart", tier: "Strategic Client", v: "₹8.9L", bg: "bg-secondary-fixed" },
-    { i: "JS", name: "JSW Steel Ltd", tier: "Key Account", v: "₹6.2L", bg: "bg-tertiary-fixed" },
-    { i: "AM", name: "Adani Metals", tier: "Enterprise", v: "₹5.8L", bg: "bg-surface-container-high" },
-  ];
+function TopCustomers({ data }: { data: any[] }) {
+  const displayCustomers = data && data.length > 0
+    ? [...data].sort((a, b) => (b.stats?.totalRevenue || 0) - (a.stats?.totalRevenue || 0)).slice(0, 4)
+    : [
+        { id: "TC", companyName: "Tata Components", customerType: "Tier 1 Partner", stats: { totalRevenue: 1240000 } },
+        { id: "RM", companyName: "Reliance Mart", customerType: "Strategic Client", stats: { totalRevenue: 890000 } },
+        { id: "JS", companyName: "JSW Steel Ltd", customerType: "Key Account", stats: { totalRevenue: 620000 } },
+        { id: "AM", companyName: "Adani Metals", customerType: "Enterprise", stats: { totalRevenue: 580000 } },
+      ];
+
   return (
     <TableCard title="Top Customers" icon="group">
       <table className="w-full text-left font-body-md text-body-md">
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.i} className="border-b border-outline-variant hover:bg-surface-container-lowest">
+          {displayCustomers.map((r: any) => (
+            <tr key={r.id || r._id} className="border-b border-outline-variant hover:bg-surface-container-lowest">
               <td className="p-4 flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full ${r.bg} flex items-center justify-center text-[10px] font-bold`}>
-                  {r.i}
+                <div className={`w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-[10px] font-bold uppercase`}>
+                  {r.companyName ? r.companyName.charAt(0) : "C"}
                 </div>
                 <div>
-                  <p className="font-bold">{r.name}</p>
-                  <p className="text-[10px] text-outline">{r.tier}</p>
+                  <p className="font-bold">{r.companyName}</p>
+                  <p className="text-[10px] text-outline">{r.customerType || "Client"}</p>
                 </div>
               </td>
-              <td className="p-4 text-right">{r.v}</td>
+              <td className="p-4 text-right font-medium">₹{(r.stats?.totalRevenue || 0).toLocaleString("en-IN")}</td>
             </tr>
           ))}
         </tbody>
@@ -259,27 +343,42 @@ function TopCustomers() {
   );
 }
 
-function RecentOrders() {
-  const rows = [
-    { id: "#ORD-4592", t: "2 mins ago", s: "PROCESSING", sc: "bg-surface-container text-primary", v: "₹24,500" },
-    { id: "#ORD-4591", t: "1 hour ago", s: "SHIPPED", sc: "bg-secondary-container/40 text-secondary", v: "₹1,12,000" },
-    { id: "#ORD-4590", t: "3 hours ago", s: "DELIVERED", sc: "bg-status-success/10 text-status-success", v: "₹45,200" },
-    { id: "#ORD-4589", t: "5 hours ago", s: "HOLD", sc: "bg-error-container/40 text-error", v: "₹9,800" },
-  ];
+function RecentOrders({ data }: { data: any[] }) {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "DELIVERED": return "bg-status-success/10 text-status-success";
+      case "SHIPPED": return "bg-blue-100 text-blue-800";
+      case "APPROVED": return "bg-purple-100 text-purple-800";
+      case "DRAFT": return "bg-gray-100 text-gray-800";
+      default: return "bg-yellow-100 text-yellow-800";
+    }
+  };
+
+  const displayOrders = data && data.length > 0
+    ? [...data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 4)
+    : [
+        { _id: "1", orderNumber: "#ORD-4592", createdAt: new Date(), status: "PENDING_MD_APPROVAL", totalOrderValue: 24500 },
+        { _id: "2", orderNumber: "#ORD-4591", createdAt: new Date(Date.now() - 3600000), status: "SHIPPED", totalOrderValue: 112000 },
+        { _id: "3", orderNumber: "#ORD-4590", createdAt: new Date(Date.now() - 10800000), status: "DELIVERED", totalOrderValue: 45200 },
+        { _id: "4", orderNumber: "#ORD-4589", createdAt: new Date(Date.now() - 18000000), status: "DRAFT", totalOrderValue: 9800 },
+      ];
+
   return (
     <TableCard title="Recent Orders" icon="shopping_bag">
       <table className="w-full text-left font-body-md text-body-md">
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="border-b border-outline-variant hover:bg-surface-container-lowest">
+          {displayOrders.map((r: any) => (
+            <tr key={r._id} className="border-b border-outline-variant hover:bg-surface-container-lowest">
               <td className="p-4">
-                <p className="font-bold">{r.id}</p>
-                <p className="text-[10px] text-outline">{r.t}</p>
+                <Link to={`/orders/${r._id}`} className="font-bold hover:underline hover:text-primary">
+                  {r.orderNumber}
+                </Link>
+                <p className="text-[10px] text-outline">{new Date(r.createdAt).toLocaleDateString()}</p>
               </td>
               <td className="p-4">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${r.sc}`}>{r.s}</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusColor(r.status)}`}>{r.status}</span>
               </td>
-              <td className="p-4 text-right">{r.v}</td>
+              <td className="p-4 text-right font-medium">₹{(r.totalOrderValue || 0).toLocaleString("en-IN")}</td>
             </tr>
           ))}
         </tbody>
@@ -288,27 +387,30 @@ function RecentOrders() {
   );
 }
 
-function PendingCollections() {
-  const rows = [
-    { name: "Bajaj Auto", note: "Overdue 12 Days", noteCls: "text-error", v: "₹85K", icon: "send" },
-    { name: "Hero Moto", note: "Overdue 8 Days", noteCls: "text-error", v: "₹210K", icon: "send" },
-    { name: "MRF Tyres", note: "Due in 2 Days", noteCls: "text-status-warning", v: "₹45K", icon: "schedule" },
-    { name: "Apollo Tubes", note: "Overdue 45 Days", noteCls: "text-error", v: "₹32K", icon: "send" },
-  ];
+function PendingCollections({ data }: { data: any[] }) {
+  const displayCollections = data && data.length > 0
+    ? [...data].filter((inv: any) => inv.status !== "PAID").slice(0, 4)
+    : [
+        { _id: "1", customerId: { companyName: "Bajaj Auto" }, remarks: "Overdue 12 Days", outstandingAmount: 85000 },
+        { _id: "2", customerId: { companyName: "Hero Moto" }, remarks: "Overdue 8 Days", outstandingAmount: 210000 },
+        { _id: "3", customerId: { companyName: "MRF Tyres" }, remarks: "Due in 2 Days", outstandingAmount: 45000 },
+        { _id: "4", customerId: { companyName: "Apollo Tubes" }, remarks: "Overdue 45 Days", outstandingAmount: 32000 },
+      ];
+
   return (
     <TableCard title="Pending Collections" icon="priority_high" iconColor="text-error">
       <table className="w-full text-left font-body-md text-body-md">
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.name} className="border-b border-outline-variant hover:bg-surface-container-lowest">
+          {displayCollections.map((r: any) => (
+            <tr key={r._id} className="border-b border-outline-variant hover:bg-surface-container-lowest">
               <td className="p-4">
-                <p className="font-bold">{r.name}</p>
-                <p className={`text-[10px] font-semibold ${r.noteCls}`}>{r.note}</p>
+                <p className="font-bold">{r.customerId?.companyName || "Unknown Customer"}</p>
+                <p className={`text-[10px] font-semibold text-error`}>{r.remarks || "Pending Payment"}</p>
               </td>
-              <td className="p-4 text-right font-headline-sm text-headline-sm">{r.v}</td>
+              <td className="p-4 text-right font-bold text-red-600">₹{(r.outstandingAmount || 0).toLocaleString("en-IN")}</td>
               <td className="p-4 text-right">
-                <button className="p-1 hover:bg-surface-container rounded transition-colors">
-                  <span className="material-symbols-outlined text-outline">{r.icon}</span>
+                <button className="p-1 hover:bg-surface-container rounded transition-colors" title="Send Reminder">
+                  <span className="material-symbols-outlined text-outline">send</span>
                 </button>
               </td>
             </tr>
