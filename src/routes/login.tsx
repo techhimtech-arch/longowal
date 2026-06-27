@@ -51,23 +51,18 @@ function Login() {
     setShowPassword(!showPassword);
   };
 
-  const onSubmit = async (data: LoginFormValues) => {
-    // In a real app, handle API authentication here
-    // For now, mock a successful login based on email
-    let role: "Admin" | "Sales Executive" | "Operations" | "Accounts" = "Admin";
-    
-    if (data.email.includes("sales")) role = "Sales Executive";
-    if (data.email.includes("ops")) role = "Operations";
-    if (data.email.includes("account")) role = "Accounts";
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-    login({
-      id: "usr-" + Date.now(),
-      name: data.email.split("@")[0],
-      email: data.email,
-      role: role
-    });
-    
-    navigate({ to: "/", replace: true });
+  const onSubmit = async (data: LoginFormValues) => {
+    setErrorMsg(null);
+    try {
+      await login(data.email, data.password);
+      navigate({ to: "/", replace: true });
+    } catch (error: any) {
+      console.error(error);
+      const msg = error.response?.data?.message || "Invalid email or password. Please try again.";
+      setErrorMsg(msg);
+    }
   };
 
   if (isLoading) return null;
@@ -92,6 +87,12 @@ function Login() {
             </div>
 
             <form className="space-y-gutter" onSubmit={handleSubmit(onSubmit)}>
+              {errorMsg && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded text-sm font-medium animate-in fade-in slide-in-from-top-1 duration-200">
+                  {errorMsg}
+                </div>
+              )}
+
               {/* Email / Username */}
               <div className="space-y-1 group/input">
                 <label className="block font-label-md text-label-md text-on-surface group-focus-within/input:text-primary transition-colors" htmlFor="email">Email</label>
