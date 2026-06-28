@@ -12,7 +12,7 @@ export function Dashboard() {
     }
   });
 
-  const { data: invoicesRes } = useQuery({
+  const { data: invoicesRes, isLoading: isLoadingInvoices } = useQuery({
     queryKey: ["invoices"],
     queryFn: async () => {
       const res = await api.get("/finance/invoices");
@@ -20,7 +20,7 @@ export function Dashboard() {
     }
   });
 
-  const { data: customersRes } = useQuery({
+  const { data: customersRes, isLoading: isLoadingCustomers } = useQuery({
     queryKey: ["customers"],
     queryFn: async () => {
       const res = await api.get("/customers");
@@ -28,7 +28,7 @@ export function Dashboard() {
     }
   });
 
-  const { data: leadsRes } = useQuery({
+  const { data: leadsRes, isLoading: isLoadingLeads } = useQuery({
     queryKey: ["leads"],
     queryFn: async () => {
       const res = await api.get("/leads");
@@ -36,7 +36,7 @@ export function Dashboard() {
     }
   });
 
-  const { data: paymentsRes } = useQuery({
+  const { data: paymentsRes, isLoading: isLoadingPayments } = useQuery({
     queryKey: ["payments"],
     queryFn: async () => {
       const res = await api.get("/finance/payments");
@@ -44,41 +44,65 @@ export function Dashboard() {
     }
   });
 
+  const isLoading = isLoadingOrders || isLoadingInvoices || isLoadingCustomers || isLoadingLeads || isLoadingPayments;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-wireframe-bg-alt text-muted-foreground gap-2">
+        <span className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></span>
+        Loading dashboard metrics...
+      </div>
+    );
+  }
+
   const orders = ordersRes || [];
   const invoices = invoicesRes || [];
   const customers = customersRes || [];
   const leads = leadsRes || [];
   const payments = paymentsRes || [];
 
-  // Calculations
+  // Calculations & Fallbacks based on data presence
+  const hasInvoices = invoices.length > 0;
+  const hasCustomers = customers.length > 0;
+  const hasOrders = orders.length > 0;
+  const hasPayments = payments.length > 0;
+  const hasLeads = leads.length > 0;
+
   const totalRevenueVal = invoices.reduce((acc: number, curr: any) => acc + (curr.invoiceAmount || 0), 0);
-  const totalRevenue = totalRevenueVal > 0 ? `₹${totalRevenueVal.toLocaleString("en-IN")}` : "₹48,25,000";
+  const totalRevenue = hasInvoices ? `₹${totalRevenueVal.toLocaleString("en-IN")}` : "₹48,25,000";
 
   const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
   const monthlyRevenueVal = invoices
-    .filter((inv: any) => new Date(inv.createdAt).getMonth() === currentMonth)
+    .filter((inv: any) => {
+      const d = new Date(inv.createdAt);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    })
     .reduce((acc: number, curr: any) => acc + (curr.invoiceAmount || 0), 0);
-  const monthlyRevenue = monthlyRevenueVal > 0 ? `₹${monthlyRevenueVal.toLocaleString("en-IN")}` : "₹8,42,100";
+  const monthlyRevenue = hasInvoices ? `₹${monthlyRevenueVal.toLocaleString("en-IN")}` : "₹8,42,100";
 
   const outstandingVal = invoices.reduce((acc: number, curr: any) => acc + (curr.outstandingAmount || 0), 0);
-  const outstanding = outstandingVal > 0 ? `₹${outstandingVal.toLocaleString("en-IN")}` : "₹12,80,450";
+  const outstanding = hasInvoices ? `₹${outstandingVal.toLocaleString("en-IN")}` : "₹12,80,450";
 
   const activeCustomersVal = customers.length;
-  const activeCustomers = activeCustomersVal > 0 ? activeCustomersVal.toString() : "1,248";
+  const activeCustomers = hasCustomers ? activeCustomersVal.toString() : "1,248";
 
-  const activeOrdersVal = orders.filter((o: any) => !["DELIVERED", "CLOSED", "CANCELLED"].includes(o.status)).length;
-  const activeOrders = activeOrdersVal > 0 ? activeOrdersVal : 342;
+  const activeOrdersVal = orders.filter((o: any) => !["DELIVERED", "COMPLETED", "CANCELLED"].includes(o.status)).length;
+  const activeOrders = hasOrders ? activeOrdersVal : 342;
 
   const dispatchesVal = orders.filter((o: any) => ["SHIPPED", "DISPATCH_READY"].includes(o.status)).length;
-  const dispatchesToday = dispatchesVal > 0 ? dispatchesVal : 58;
+  const dispatchesToday = hasOrders ? dispatchesVal : 58;
 
   const collectionVal = payments
-    .filter((p: any) => new Date(p.paymentDate).getMonth() === currentMonth)
+    .filter((p: any) => {
+      const d = new Date(p.paymentDate);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    })
     .reduce((acc: number, curr: any) => acc + (curr.amountReceived || 0), 0);
-  const collectionMtd = collectionVal > 0 ? `₹${collectionVal.toLocaleString("en-IN")}` : "₹6,20,000";
+  const collectionMtd = hasPayments ? `₹${collectionVal.toLocaleString("en-IN")}` : "₹6,20,000";
 
   const newLeadsVal = leads.filter((l: any) => l.status === "New").length;
-  const newLeads = newLeadsVal > 0 ? newLeadsVal : 124;
+  const newLeads = hasLeads ? newLeadsVal : 124;
 
   return (
     <div className="p-gutter space-y-gutter">

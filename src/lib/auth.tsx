@@ -13,7 +13,7 @@ type AuthContextType = {
 	isAuthenticated: boolean;
 	isLoading: boolean;
 	login: (email: string, password: string) => Promise<void>;
-	logout: () => void;
+	logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,7 +52,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		}
 	};
 
-	const logout = () => {
+	const logout = async () => {
+		const refreshToken = localStorage.getItem('refresh_token');
+		if (refreshToken) {
+			try {
+				await api.post('/auth/logout', { refreshToken }, { skipToast: true } as any);
+			} catch (err) {
+				console.error('Backend logout failed', err);
+			}
+		}
 		localStorage.removeItem('access_token');
 		localStorage.removeItem('refresh_token');
 		localStorage.removeItem('ooms_user');
