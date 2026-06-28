@@ -15,7 +15,7 @@ const userSchema = z.object({
   fullName: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Invalid email address" }),
   mobile: z.string().min(10, { message: "Mobile number must be at least 10 digits" }),
-  role: z.enum(["Admin", "Sales Executive", "Operations", "Accounts"], {
+  role: z.enum(["Admin", "Sales Executive", "Operations", "Accounts", "Logistics"], {
     required_error: "Please select a role",
   }),
   password: z.string()
@@ -37,6 +37,7 @@ function mapRoleToUserType(role: string): string {
   if (role === "Sales Executive") return "ORG_ADMIN";
   if (role === "Operations") return "VOLUNTEER";
   if (role === "Accounts") return "CITIZEN";
+  if (role === "Logistics") return "LOGISTICS_TEAM";
   return "ORG_ADMIN";
 }
 
@@ -125,9 +126,9 @@ function CreateUser() {
             <div className="grid grid-cols-1 gap-6">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground">Full Name *</label>
-                <input 
-                  type="text" 
-                  className={`w-full border ${errors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-input'} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2`} 
+                <input
+                  type="text"
+                  className={`w-full border ${errors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-input'} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2`}
                   placeholder="e.g. John Doe"
                   {...register("fullName")}
                 />
@@ -136,9 +137,9 @@ function CreateUser() {
 
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground">Email Address *</label>
-                <input 
-                  type="email" 
-                  className={`w-full border ${errors.email ? 'border-red-500 focus:ring-red-500' : 'border-input'} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2`} 
+                <input
+                  type="email"
+                  className={`w-full border ${errors.email ? 'border-red-500 focus:ring-red-500' : 'border-input'} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2`}
                   placeholder="john@example.com"
                   {...register("email")}
                 />
@@ -147,9 +148,9 @@ function CreateUser() {
 
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground">Mobile Number (e.g. 9876543210) *</label>
-                <input 
-                  type="text" 
-                  className={`w-full border ${errors.mobile ? 'border-red-500 focus:ring-red-500' : 'border-input'} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2`} 
+                <input
+                  type="text"
+                  className={`w-full border ${errors.mobile ? 'border-red-500 focus:ring-red-500' : 'border-input'} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2`}
                   placeholder="9876543210"
                   {...register("mobile")}
                 />
@@ -160,10 +161,10 @@ function CreateUser() {
                 <label className="text-sm font-medium text-foreground">Assign Role *</label>
                 <p className="text-xs text-muted-foreground mb-3">Select the appropriate role to grant the user specific system permissions.</p>
                 <div className="grid grid-cols-2 gap-3">
-                  {["Sales Executive", "Operations", "Accounts", "Admin"].map((roleOption) => (
+                  {["Sales Executive", "Operations", "Accounts", "Admin", "Logistics"].map((roleOption) => (
                     <label key={roleOption} className="flex items-center gap-3 p-3 border border-wireframe-border rounded-md hover:bg-wireframe-bg-alt cursor-pointer">
-                      <input 
-                        type="radio" 
+                      <input
+                        type="radio"
                         value={roleOption}
                         className="w-4 h-4 text-primary"
                         {...register("role")}
@@ -180,9 +181,9 @@ function CreateUser() {
               <div className="space-y-1.5 border-t border-wireframe-border pt-6 mt-2">
                 <label className="text-sm font-medium text-foreground">Password *</label>
                 <p className="text-xs text-muted-foreground mb-2">Must be at least 8 characters, with 1 uppercase, 1 lowercase, 1 number, and 1 special symbol.</p>
-                <input 
-                  type="password" 
-                  className={`w-full border ${errors.password ? 'border-red-500 focus:ring-red-500' : 'border-input'} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2`} 
+                <input
+                  type="password"
+                  className={`w-full border ${errors.password ? 'border-red-500 focus:ring-red-500' : 'border-input'} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2`}
                   placeholder="Enter secure password"
                   {...register("password")}
                 />
@@ -191,9 +192,9 @@ function CreateUser() {
 
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground">Confirm Password *</label>
-                <input 
-                  type="password" 
-                  className={`w-full border ${errors.confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-input'} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2`} 
+                <input
+                  type="password"
+                  className={`w-full border ${errors.confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-input'} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2`}
                   placeholder="Confirm password"
                   {...register("confirmPassword")}
                 />
