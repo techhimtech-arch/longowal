@@ -1,4 +1,11 @@
 import axios from 'axios';
+import { toast } from 'sonner';
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipToast?: boolean;
+  }
+}
 
 const api = axios.create({
   baseURL: 'http://localhost:5000/api/v1',
@@ -26,11 +33,18 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config as any;
 
+    // Check if the request was to an authentication endpoint
+    const isAuthEndpoint = originalRequest?.url && (
+      originalRequest.url.includes('/auth/login') ||
+      originalRequest.url.includes('/auth/refresh-token')
+    );
+
     if (
       error.response &&
       error.response.status === 401 &&
       originalRequest &&
-      !originalRequest._retry
+      !originalRequest._retry &&
+      !isAuthEndpoint
     ) {
       originalRequest._retry = true;
 
@@ -62,10 +76,22 @@ api.interceptors.response.use(
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('ooms_user');
         
+        toast.error('Session expired. Please log in again.');
+        
         // Use window redirect as fallback if routing isn't ready
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
+    }
+
+    // For all other errors, show a toast if not skipped and not an auth endpoint
+    if (originalRequest && !originalRequest.skipToast && !isAuthEndpoint) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        'An unexpected error occurred';
+      toast.error(errorMessage);
     }
 
     return Promise.reject(error);

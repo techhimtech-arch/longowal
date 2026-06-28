@@ -149,7 +149,6 @@ function CreateOrder() {
     },
     onError: (error: any) => {
       console.error(error);
-      toast.error(error.message || error.response?.data?.message || "Failed to create order");
     }
   });
 

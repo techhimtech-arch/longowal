@@ -127,7 +127,6 @@ function OrderDetail() {
     },
     onError: (err: any) => {
       console.error(err);
-      toast.error(err.response?.data?.message || "Failed to update logistics");
     }
   });
 
@@ -145,7 +144,6 @@ function OrderDetail() {
     },
     onError: (err: any) => {
       console.error(err);
-      toast.error(err.response?.data?.message || "Failed to update status");
     }
   });
 
@@ -167,7 +165,6 @@ function OrderDetail() {
     },
     onError: (err: any) => {
       console.error(err);
-      toast.error(err.response?.data?.message || "Failed to generate invoice");
     }
   });
 
@@ -198,7 +195,6 @@ function OrderDetail() {
     },
     onError: (err: any) => {
       console.error(err);
-      toast.error(err.response?.data?.message || "Failed to record payment");
     }
   });
 

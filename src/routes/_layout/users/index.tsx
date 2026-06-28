@@ -61,7 +61,6 @@ function UsersList() {
     },
     onError: (err: any) => {
       console.error(err);
-      toast.error(err.response?.data?.message || "Failed to update user status");
     },
   });
 

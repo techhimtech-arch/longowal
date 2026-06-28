@@ -44,7 +44,6 @@ function LeadDetail() {
     },
     onError: (err: any) => {
       console.error(err);
-      toast.error(err.response?.data?.message || "Failed to save note");
     },
   });
 
@@ -81,7 +80,6 @@ function LeadDetail() {
     },
     onError: (err: any) => {
       console.error(err);
-      toast.error(err.response?.data?.message || "Conversion failed");
     },
   });
 
