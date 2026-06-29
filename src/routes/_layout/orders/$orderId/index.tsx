@@ -14,6 +14,10 @@ function OrderDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const normalizedRole = (user?.role || "").toLowerCase().replace(/[\s_-]/g, "");
+  const isSuperAdminOrAdmin = normalizedRole === "superadmin" || normalizedRole === "admin";
+  const isOperations = normalizedRole === "operations" || normalizedRole === "volunteer";
+  const isAccounts = normalizedRole === "accounts" || normalizedRole === "citizen" || normalizedRole === "accountant";
   const [activeTab, setActiveTab] = useState("overview");
 
   // Edit Logistics form state
@@ -267,7 +271,7 @@ function OrderDetail() {
             </button>
           )}
 
-          {order.status === "PENDING_MD_APPROVAL" && (user?.role === "Admin" || user?.role === "Operations") && (
+          {order.status === "PENDING_MD_APPROVAL" && (isSuperAdminOrAdmin || isOperations) && (
             <>
               <button
                 onClick={() => triggerStatusChange("APPROVED")}
@@ -639,7 +643,7 @@ function OrderDetail() {
               <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm p-8 text-center">
                 <h4 className="font-semibold text-lg mb-2">No Invoices Generated</h4>
                 <p className="text-muted-foreground mb-4">An invoice must be generated to record payments for this order.</p>
-                {(user?.role === "Admin" || user?.role === "Accounts") && (
+                {(isSuperAdminOrAdmin || isAccounts) && (
                   <button
                     onClick={() => generateInvoiceMutation.mutate()}
                     disabled={generateInvoiceMutation.isPending}
@@ -661,7 +665,7 @@ function OrderDetail() {
                   <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm overflow-hidden">
                     <div className="px-4 py-3 bg-wireframe-bg-alt/50 border-b border-wireframe-border font-medium flex justify-between items-center">
                       <span>Payments History</span>
-                      {(user?.role === "Admin" || user?.role === "Accounts") && (
+                      {(isSuperAdminOrAdmin || isAccounts) && (
                         <button
                           onClick={() => {
                             setPaymentInvoiceId(orderInvoices[0]._id);
