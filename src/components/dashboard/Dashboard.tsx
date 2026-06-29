@@ -182,10 +182,11 @@ export function Dashboard() {
       </div>
 
       {/* Tables */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
         <TopCustomers data={customers} />
         <RecentOrders data={orders} />
         <PendingCollections data={invoices} />
+        <UpcomingPayments orders={orders} />
       </div>
     </div>
   );
@@ -439,6 +440,64 @@ function PendingCollections({ data }: { data: any[] }) {
               </td>
             </tr>
           ))}
+        </tbody>
+      </table>
+    </TableCard>
+  );
+}
+
+function UpcomingPayments({ orders }: { orders: any[] }) {
+  const filtered = orders
+    .filter((o: any) => o.paymentStatus !== "PAID" && o.expectedPaymentDate)
+    .sort((a: any, b: any) => new Date(a.expectedPaymentDate).getTime() - new Date(b.expectedPaymentDate).getTime())
+    .slice(0, 5);
+
+  const getDueText = (dateStr: string) => {
+    const due = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    due.setHours(0,0,0,0);
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return `Overdue by ${Math.abs(diffDays)} days`;
+    if (diffDays === 0) return "Due Today";
+    if (diffDays === 1) return "Due Tomorrow";
+    return `Due in ${diffDays} days`;
+  };
+
+  return (
+    <TableCard title="Expected Payments (This Week)" icon="schedule" iconColor="text-primary">
+      <table className="w-full text-left font-body-md text-body-md">
+        <tbody>
+          {filtered.length === 0 ? (
+            <tr>
+              <td className="p-4 text-center text-muted-foreground">No upcoming expected payments.</td>
+            </tr>
+          ) : (
+            filtered.map((o: any) => {
+              const overdue = new Date(o.expectedPaymentDate).getTime() < Date.now();
+              return (
+                <tr key={o._id} className="border-b border-outline-variant hover:bg-surface-container-lowest">
+                  <td className="p-4">
+                    <Link to={`/orders/${o._id}`} className="font-bold text-foreground hover:text-primary transition-colors">
+                      {o.customerId?.companyName || "Unknown Customer"}
+                    </Link>
+                    <div className="flex gap-1.5 items-center mt-1">
+                      <span className="text-[10px] text-muted-foreground font-semibold">{o.orderNumber}</span>
+                      <span className={`text-[10px] font-bold uppercase ${overdue ? 'text-red-600' : 'text-primary'}`}>
+                        • {getDueText(o.expectedPaymentDate)}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-right">
+                    <p className="font-bold text-foreground">₹{(o.balanceAmount || 0).toLocaleString("en-IN")}</p>
+                    <p className="text-[10px] text-muted-foreground font-medium">Due: {new Date(o.expectedPaymentDate).toLocaleDateString()}</p>
+                  </td>
+                </tr>
+              );
+            })
+          )}
         </tbody>
       </table>
     </TableCard>

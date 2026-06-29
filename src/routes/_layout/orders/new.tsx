@@ -34,6 +34,7 @@ function CreateOrder() {
   const [estimatedFreight, setEstimatedFreight] = useState(0);
   const [remarks, setRemarks] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState(0);
+  const [expectedPaymentDate, setExpectedPaymentDate] = useState("");
 
   // Products rows
   const [products, setProducts] = useState<ProductRow[]>([
@@ -136,6 +137,7 @@ function CreateOrder() {
         advanceAmount,
         balanceAmount,
         remarks,
+        expectedPaymentDate: expectedPaymentDate ? new Date(expectedPaymentDate).toISOString() : undefined,
         status, // 'DRAFT' or 'PENDING_MD_APPROVAL'
       };
 
@@ -420,14 +422,14 @@ function CreateOrder() {
             Section 4: Financial & Additional Details
           </div>
           <div className="p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-wireframe-bg-alt/50 p-4 rounded-md border border-wireframe-border">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-wireframe-bg-alt/50 p-4 rounded-md border border-wireframe-border flex flex-col justify-center">
                 <p className="text-sm text-muted-foreground mb-1">Total Order Value</p>
                 <p className="text-2xl font-bold">₹{totalOrderValue.toLocaleString("en-IN")}</p>
               </div>
               
               <div className="space-y-1.5 p-4 border border-input rounded-md">
-                <label className="text-sm font-medium text-primary">Advance Amount Received (₹)</label>
+                <label className="text-sm font-medium text-primary">Advance Amount (₹)</label>
                 <input 
                   type="number" 
                   min="0"
@@ -437,8 +439,18 @@ function CreateOrder() {
                 />
               </div>
 
-              <div className="bg-red-50 p-4 rounded-md border border-red-100">
-                <p className="text-sm text-red-600 mb-1 font-medium">Balance Amount (Calculated)</p>
+              <div className="space-y-1.5 p-4 border border-primary/30 rounded-md bg-primary-container/10">
+                <label className="text-sm font-medium text-primary font-bold">Expected Payment Date *</label>
+                <input 
+                  type="date" 
+                  className="w-full border border-primary/30 bg-background rounded px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={expectedPaymentDate}
+                  onChange={(e) => setExpectedPaymentDate(e.target.value)}
+                />
+              </div>
+
+              <div className="bg-red-50 p-4 rounded-md border border-red-100 flex flex-col justify-center">
+                <p className="text-sm text-red-600 mb-1 font-medium">Balance Amount</p>
                 <p className="text-2xl font-bold text-red-700">₹{balanceAmount.toLocaleString("en-IN")}</p>
               </div>
             </div>
