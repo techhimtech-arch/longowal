@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/leads", label: "Leads", allowedRoles: ["superadmin", "super_admin", "admin", "orgadmin", "sales executive", "sales"] },
   { to: "/users", label: "Users", allowedRoles: ["superadmin", "super_admin", "admin"] },
   { to: "/roles", label: "Roles", allowedRoles: ["superadmin", "super_admin", "admin"] },
+  { to: "/firms", label: "Firms", allowedRoles: ["superadmin", "super_admin", "admin"] },
 ];
 
 import { formatRole } from './ProfileModal';

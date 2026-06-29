@@ -16,12 +16,15 @@ import { Route as LayoutUsersIndexRouteImport } from './routes/_layout/users/ind
 import { Route as LayoutRolesIndexRouteImport } from './routes/_layout/roles/index'
 import { Route as LayoutOrdersIndexRouteImport } from './routes/_layout/orders/index'
 import { Route as LayoutLeadsIndexRouteImport } from './routes/_layout/leads/index'
+import { Route as LayoutFirmsIndexRouteImport } from './routes/_layout/firms/index'
 import { Route as LayoutUsersNewRouteImport } from './routes/_layout/users/new'
 import { Route as LayoutOrdersNewRouteImport } from './routes/_layout/orders/new'
 import { Route as LayoutLeadsNewRouteImport } from './routes/_layout/leads/new'
+import { Route as LayoutFirmsNewRouteImport } from './routes/_layout/firms/new'
 import { Route as LayoutOrdersOrderIdIndexRouteImport } from './routes/_layout/orders/$orderId/index'
 import { Route as LayoutLeadsLeadIdIndexRouteImport } from './routes/_layout/leads/$leadId/index'
 import { Route as LayoutLeadsLeadIdFollowupRouteImport } from './routes/_layout/leads/$leadId/followup'
+import { Route as LayoutFirmsFirmIdEditRouteImport } from './routes/_layout/firms/$firmId/edit'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -57,6 +60,11 @@ const LayoutLeadsIndexRoute = LayoutLeadsIndexRouteImport.update({
   path: '/leads/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutFirmsIndexRoute = LayoutFirmsIndexRouteImport.update({
+  id: '/firms/',
+  path: '/firms/',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutUsersNewRoute = LayoutUsersNewRouteImport.update({
   id: '/users/new',
   path: '/users/new',
@@ -70,6 +78,11 @@ const LayoutOrdersNewRoute = LayoutOrdersNewRouteImport.update({
 const LayoutLeadsNewRoute = LayoutLeadsNewRouteImport.update({
   id: '/leads/new',
   path: '/leads/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutFirmsNewRoute = LayoutFirmsNewRouteImport.update({
+  id: '/firms/new',
+  path: '/firms/new',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutOrdersOrderIdIndexRoute =
@@ -89,17 +102,25 @@ const LayoutLeadsLeadIdFollowupRoute =
     path: '/leads/$leadId/followup',
     getParentRoute: () => LayoutRoute,
   } as any)
+const LayoutFirmsFirmIdEditRoute = LayoutFirmsFirmIdEditRouteImport.update({
+  id: '/firms/$firmId/edit',
+  path: '/firms/$firmId/edit',
+  getParentRoute: () => LayoutRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
   '/login': typeof LoginRoute
+  '/firms/new': typeof LayoutFirmsNewRoute
   '/leads/new': typeof LayoutLeadsNewRoute
   '/orders/new': typeof LayoutOrdersNewRoute
   '/users/new': typeof LayoutUsersNewRoute
+  '/firms/': typeof LayoutFirmsIndexRoute
   '/leads/': typeof LayoutLeadsIndexRoute
   '/orders/': typeof LayoutOrdersIndexRoute
   '/roles/': typeof LayoutRolesIndexRoute
   '/users/': typeof LayoutUsersIndexRoute
+  '/firms/$firmId/edit': typeof LayoutFirmsFirmIdEditRoute
   '/leads/$leadId/followup': typeof LayoutLeadsLeadIdFollowupRoute
   '/leads/$leadId/': typeof LayoutLeadsLeadIdIndexRoute
   '/orders/$orderId/': typeof LayoutOrdersOrderIdIndexRoute
@@ -107,13 +128,16 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/': typeof LayoutIndexRoute
+  '/firms/new': typeof LayoutFirmsNewRoute
   '/leads/new': typeof LayoutLeadsNewRoute
   '/orders/new': typeof LayoutOrdersNewRoute
   '/users/new': typeof LayoutUsersNewRoute
+  '/firms': typeof LayoutFirmsIndexRoute
   '/leads': typeof LayoutLeadsIndexRoute
   '/orders': typeof LayoutOrdersIndexRoute
   '/roles': typeof LayoutRolesIndexRoute
   '/users': typeof LayoutUsersIndexRoute
+  '/firms/$firmId/edit': typeof LayoutFirmsFirmIdEditRoute
   '/leads/$leadId/followup': typeof LayoutLeadsLeadIdFollowupRoute
   '/leads/$leadId': typeof LayoutLeadsLeadIdIndexRoute
   '/orders/$orderId': typeof LayoutOrdersOrderIdIndexRoute
@@ -123,13 +147,16 @@ export interface FileRoutesById {
   '/_layout': typeof LayoutRouteWithChildren
   '/login': typeof LoginRoute
   '/_layout/': typeof LayoutIndexRoute
+  '/_layout/firms/new': typeof LayoutFirmsNewRoute
   '/_layout/leads/new': typeof LayoutLeadsNewRoute
   '/_layout/orders/new': typeof LayoutOrdersNewRoute
   '/_layout/users/new': typeof LayoutUsersNewRoute
+  '/_layout/firms/': typeof LayoutFirmsIndexRoute
   '/_layout/leads/': typeof LayoutLeadsIndexRoute
   '/_layout/orders/': typeof LayoutOrdersIndexRoute
   '/_layout/roles/': typeof LayoutRolesIndexRoute
   '/_layout/users/': typeof LayoutUsersIndexRoute
+  '/_layout/firms/$firmId/edit': typeof LayoutFirmsFirmIdEditRoute
   '/_layout/leads/$leadId/followup': typeof LayoutLeadsLeadIdFollowupRoute
   '/_layout/leads/$leadId/': typeof LayoutLeadsLeadIdIndexRoute
   '/_layout/orders/$orderId/': typeof LayoutOrdersOrderIdIndexRoute
@@ -139,13 +166,16 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/firms/new'
     | '/leads/new'
     | '/orders/new'
     | '/users/new'
+    | '/firms/'
     | '/leads/'
     | '/orders/'
     | '/roles/'
     | '/users/'
+    | '/firms/$firmId/edit'
     | '/leads/$leadId/followup'
     | '/leads/$leadId/'
     | '/orders/$orderId/'
@@ -153,13 +183,16 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/'
+    | '/firms/new'
     | '/leads/new'
     | '/orders/new'
     | '/users/new'
+    | '/firms'
     | '/leads'
     | '/orders'
     | '/roles'
     | '/users'
+    | '/firms/$firmId/edit'
     | '/leads/$leadId/followup'
     | '/leads/$leadId'
     | '/orders/$orderId'
@@ -168,13 +201,16 @@ export interface FileRouteTypes {
     | '/_layout'
     | '/login'
     | '/_layout/'
+    | '/_layout/firms/new'
     | '/_layout/leads/new'
     | '/_layout/orders/new'
     | '/_layout/users/new'
+    | '/_layout/firms/'
     | '/_layout/leads/'
     | '/_layout/orders/'
     | '/_layout/roles/'
     | '/_layout/users/'
+    | '/_layout/firms/$firmId/edit'
     | '/_layout/leads/$leadId/followup'
     | '/_layout/leads/$leadId/'
     | '/_layout/orders/$orderId/'
@@ -236,6 +272,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutLeadsIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/firms/': {
+      id: '/_layout/firms/'
+      path: '/firms'
+      fullPath: '/firms/'
+      preLoaderRoute: typeof LayoutFirmsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/users/new': {
       id: '/_layout/users/new'
       path: '/users/new'
@@ -255,6 +298,13 @@ declare module '@tanstack/react-router' {
       path: '/leads/new'
       fullPath: '/leads/new'
       preLoaderRoute: typeof LayoutLeadsNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/firms/new': {
+      id: '/_layout/firms/new'
+      path: '/firms/new'
+      fullPath: '/firms/new'
+      preLoaderRoute: typeof LayoutFirmsNewRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/orders/$orderId/': {
@@ -278,18 +328,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutLeadsLeadIdFollowupRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/firms/$firmId/edit': {
+      id: '/_layout/firms/$firmId/edit'
+      path: '/firms/$firmId/edit'
+      fullPath: '/firms/$firmId/edit'
+      preLoaderRoute: typeof LayoutFirmsFirmIdEditRouteImport
+      parentRoute: typeof LayoutRoute
+    }
   }
 }
 
 interface LayoutRouteChildren {
   LayoutIndexRoute: typeof LayoutIndexRoute
+  LayoutFirmsNewRoute: typeof LayoutFirmsNewRoute
   LayoutLeadsNewRoute: typeof LayoutLeadsNewRoute
   LayoutOrdersNewRoute: typeof LayoutOrdersNewRoute
   LayoutUsersNewRoute: typeof LayoutUsersNewRoute
+  LayoutFirmsIndexRoute: typeof LayoutFirmsIndexRoute
   LayoutLeadsIndexRoute: typeof LayoutLeadsIndexRoute
   LayoutOrdersIndexRoute: typeof LayoutOrdersIndexRoute
   LayoutRolesIndexRoute: typeof LayoutRolesIndexRoute
   LayoutUsersIndexRoute: typeof LayoutUsersIndexRoute
+  LayoutFirmsFirmIdEditRoute: typeof LayoutFirmsFirmIdEditRoute
   LayoutLeadsLeadIdFollowupRoute: typeof LayoutLeadsLeadIdFollowupRoute
   LayoutLeadsLeadIdIndexRoute: typeof LayoutLeadsLeadIdIndexRoute
   LayoutOrdersOrderIdIndexRoute: typeof LayoutOrdersOrderIdIndexRoute
@@ -297,13 +357,16 @@ interface LayoutRouteChildren {
 
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutIndexRoute: LayoutIndexRoute,
+  LayoutFirmsNewRoute: LayoutFirmsNewRoute,
   LayoutLeadsNewRoute: LayoutLeadsNewRoute,
   LayoutOrdersNewRoute: LayoutOrdersNewRoute,
   LayoutUsersNewRoute: LayoutUsersNewRoute,
+  LayoutFirmsIndexRoute: LayoutFirmsIndexRoute,
   LayoutLeadsIndexRoute: LayoutLeadsIndexRoute,
   LayoutOrdersIndexRoute: LayoutOrdersIndexRoute,
   LayoutRolesIndexRoute: LayoutRolesIndexRoute,
   LayoutUsersIndexRoute: LayoutUsersIndexRoute,
+  LayoutFirmsFirmIdEditRoute: LayoutFirmsFirmIdEditRoute,
   LayoutLeadsLeadIdFollowupRoute: LayoutLeadsLeadIdFollowupRoute,
   LayoutLeadsLeadIdIndexRoute: LayoutLeadsLeadIdIndexRoute,
   LayoutOrdersOrderIdIndexRoute: LayoutOrdersOrderIdIndexRoute,
