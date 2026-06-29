@@ -45,6 +45,9 @@ function CreateLead() {
   const { user } = useAuth();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const normalizedRole = (user?.role || "").toLowerCase().replace(/[\s_-]/g, "");
+  const isAdmin = normalizedRole === "superadmin" || normalizedRole === "admin";
+
   const {
     register,
     handleSubmit,
@@ -82,6 +85,7 @@ function CreateLead() {
   const { data: users = [] } = useQuery({
     queryKey: ["users"],
     queryFn: async () => {
+      if (!isAdmin) return [];
       try {
         const res = await api.get("/users");
         return res.data?.data || [];
@@ -90,6 +94,7 @@ function CreateLead() {
         return [];
       }
     },
+    enabled: isAdmin,
   });
 
   // Create lead mutation
@@ -406,28 +411,22 @@ function CreateLead() {
                 </select>
               </div>
 
-              <div className="space-y-1.5 col-span-2">
-                <label className="text-sm font-medium">Assigned Executive</label>
-                <select
-                  {...register("assignedExecutiveId")}
-                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                >
-                  <option value="">Select Executive</option>
-                  {users.length > 0 ? (
-                    users.map((u: any) => (
+              {isAdmin && (
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-sm font-medium">Assigned Executive</label>
+                  <select
+                    {...register("assignedExecutiveId")}
+                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                  >
+                    <option value="">Select Executive</option>
+                    {users.map((u: any) => (
                       <option key={u._id} value={u._id}>
                         {u.firstName} {u.lastName} ({u.email})
                       </option>
-                    ))
-                  ) : (
-                    user && (
-                      <option value={user.id}>
-                        {user.name} ({user.email})
-                      </option>
-                    )
-                  )}
-                </select>
-              </div>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
         </div>
