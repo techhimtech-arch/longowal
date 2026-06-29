@@ -192,10 +192,23 @@ function OrderDetail() {
   });
 
   const invoiceIds = orderInvoices.map((inv: any) => inv._id);
-  const orderPayments = payments.filter((pay: any) => {
-    const payInvId = pay.invoiceId?._id || pay.invoiceId;
-    return invoiceIds.includes(payInvId);
-  });
+  const advancePaymentItem = order?.advanceAmount > 0 ? {
+    _id: "advance-payment-id",
+    paymentDate: order.createdAt || order.orderDate,
+    amountReceived: order.advanceAmount,
+    paymentMode: "Advance Received",
+    referenceNumber: "ORD-ADVANCE",
+    remarks: "Advance amount received at order booking",
+    isAdvance: true
+  } : null;
+
+  const orderPayments = [
+    ...(advancePaymentItem ? [advancePaymentItem] : []),
+    ...payments.filter((pay: any) => {
+      const payInvId = pay.invoiceId?._id || pay.invoiceId;
+      return invoiceIds.includes(payInvId);
+    })
+  ];
 
   // Calculate outstanding
   const outstandingSummary = useMemoOutstanding(orderInvoices);
@@ -555,6 +568,114 @@ function OrderDetail() {
                 <div>
                   <p className="text-sm text-muted-foreground">Delivery Location</p>
                   <p className="font-medium text-xs whitespace-pre-line">{order.deliveryAddress || "-"}</p>
+                </div>
+              </div>
+
+              {/* Order Balance Sheet / Ledger */}
+              <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm p-5 space-y-4">
+                <h3 className="font-semibold text-lg border-b border-wireframe-border pb-2 flex items-center gap-1.5 text-primary">
+                  <span className="material-symbols-outlined text-[20px]">account_balance</span>
+                  Order Balance Sheet
+                </h3>
+                <div className="space-y-2.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Order Value:</span>
+                    <span className="font-semibold text-foreground">₹{(order.totalOrderValue || 0).toLocaleString("en-IN")}</span>
+                  </div>
+                  
+                  {/* Transport / Freight cost details */}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      Freight Cost:
+                      {order.logistics?.freightCost ? (
+                        <span className="text-[10px] bg-green-100 text-green-800 px-1 rounded font-bold uppercase">Actual</span>
+                      ) : (
+                        <span className="text-[10px] bg-gray-100 text-gray-800 px-1 rounded font-bold uppercase">Est.</span>
+                      )}
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      ₹{(order.logistics?.freightCost || order.estimatedFreight || 0).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  {/* Loading Charges if present */}
+                  {(order.logistics?.loadingCharges || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Loading Charges:</span>
+                      <span className="font-semibold text-foreground">₹{order.logistics.loadingCharges.toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
+
+                  {/* Other Charges if present */}
+                  {(order.logistics?.otherCharges || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Other Charges:</span>
+                      <span className="font-semibold text-foreground">₹{order.logistics.otherCharges.toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
+
+                  <hr className="border-wireframe-border" />
+
+                  {/* Total Billing Value */}
+                  <div className="flex justify-between font-bold text-foreground">
+                    <span>Total Billing Value:</span>
+                    <span>
+                      ₹{(
+                        (order.totalOrderValue || 0) +
+                        (order.logistics?.freightCost || order.estimatedFreight || 0) +
+                        (order.logistics?.loadingCharges || 0) +
+                        (order.logistics?.otherCharges || 0)
+                      ).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  <hr className="border-wireframe-border" />
+
+                  {/* Payments Breakdown */}
+                  <div className="space-y-1 bg-wireframe-bg-alt/20 p-2.5 rounded border border-wireframe-border/50 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Advance Received:</span>
+                      <span className="font-medium text-foreground">₹{(order.advanceAmount || 0).toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between text-green-700">
+                      <span>Invoiced Payments:</span>
+                      <span className="font-medium">- ₹{outstandingSummary.received.toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between font-bold text-green-700">
+                    <span>Total Received:</span>
+                    <span>
+                      ₹{(
+                        (order.advanceAmount || 0) + 
+                        outstandingSummary.received
+                      ).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  <hr className="border-wireframe-border" />
+
+                  {/* Net Outstanding Balance */}
+                  <div className="flex justify-between font-bold items-center py-1">
+                    <span className="text-foreground">Net Outstanding Balance:</span>
+                    <span className={`text-base p-1 px-2.5 rounded ${
+                      (
+                        ((order.totalOrderValue || 0) +
+                        (order.logistics?.freightCost || order.estimatedFreight || 0) +
+                        (order.logistics?.loadingCharges || 0) +
+                        (order.logistics?.otherCharges || 0)) -
+                        ((order.advanceAmount || 0) + outstandingSummary.received)
+                      ) > 0 ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'
+                    }`}>
+                      ₹{(
+                        ((order.totalOrderValue || 0) +
+                        (order.logistics?.freightCost || order.estimatedFreight || 0) +
+                        (order.logistics?.loadingCharges || 0) +
+                        (order.logistics?.otherCharges || 0)) -
+                        ((order.advanceAmount || 0) + outstandingSummary.received)
+                      ).toLocaleString("en-IN")}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
