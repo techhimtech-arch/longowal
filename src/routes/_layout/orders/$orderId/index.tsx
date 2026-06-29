@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -56,6 +56,118 @@ function OrderDetail() {
   });
 
   const order = orderResponse?.data;
+
+  const [isEditingOrder, setIsEditingOrder] = useState(false);
+
+  // Fetch Firms list
+  const { data: firms = [] } = useQuery({
+    queryKey: ["firms"],
+    queryFn: async () => {
+      const res = await api.get("/firms");
+      return res.data?.data || [];
+    }
+  });
+
+  // Fetch Customers list
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers"],
+    queryFn: async () => {
+      const res = await api.get("/customers");
+      return res.data?.data || [];
+    }
+  });
+
+  // Edit Order Modal States
+  const [editCustomer, setEditCustomer] = useState("");
+  const [editFirm, setEditFirm] = useState("");
+  const [editExpectedPaymentDate, setEditExpectedPaymentDate] = useState("");
+  const [editDeliveryAddress, setEditDeliveryAddress] = useState("");
+  const [editDispatchLocation, setEditDispatchLocation] = useState("");
+  const [editPlantName, setEditPlantName] = useState("");
+  const [editRequiredDeliveryDate, setEditRequiredDeliveryDate] = useState("");
+  const [editEstimatedFreight, setEditEstimatedFreight] = useState(0);
+  const [editAdvanceAmount, setEditAdvanceAmount] = useState(0);
+  const [editRemarks, setEditRemarks] = useState("");
+  const [editProducts, setEditProducts] = useState<any[]>([]);
+
+  // Calculate if payment is overdue
+  const isPaymentOverdue = order?.expectedPaymentDate && 
+    new Date(order.expectedPaymentDate).getTime() < Date.now() && 
+    order.paymentStatus !== "PAID" &&
+    order.status !== "PAID";
+
+  useEffect(() => {
+    if (order) {
+      setEditCustomer(order.customerId?._id || order.customerId || "");
+      setEditFirm(order.executionFirmId?._id || order.executionFirmId || "");
+      setEditExpectedPaymentDate(order.expectedPaymentDate ? new Date(order.expectedPaymentDate).toISOString().split("T")[0] : "");
+      setEditDeliveryAddress(order.deliveryAddress || "");
+      setEditDispatchLocation(order.dispatchLocation || "");
+      setEditPlantName(order.plantName || "");
+      setEditRequiredDeliveryDate(order.requiredDeliveryDate ? new Date(order.requiredDeliveryDate).toISOString().split("T")[0] : "");
+      setEditEstimatedFreight(order.estimatedFreight || 0);
+      setEditAdvanceAmount(order.advanceAmount || 0);
+      setEditRemarks(order.remarks || "");
+      
+      const mappedProducts = (order.products || []).map((p: any, idx: number) => ({
+        id: p._id || idx,
+        productName: p.productName,
+        quantity: p.quantity,
+        unit: p.unit,
+        rate: p.rate,
+        total: p.total
+      }));
+      setEditProducts(mappedProducts.length > 0 ? mappedProducts : [{ id: 1, productName: "", quantity: 0, unit: "tons", rate: 0, total: 0 }]);
+    }
+  }, [order, isEditingOrder]);
+
+  const updateOrderMutation = useMutation({
+    mutationFn: async () => {
+      const mappedProducts = editProducts
+        .filter(p => p.productName && p.quantity > 0)
+        .map(p => ({
+          productName: p.productName,
+          quantity: p.quantity,
+          unit: p.unit,
+          rate: p.rate,
+          total: p.quantity * p.rate
+        }));
+
+      if (mappedProducts.length === 0) {
+        throw new Error("Please add at least one valid product");
+      }
+
+      const totalVal = mappedProducts.reduce((acc, p) => acc + p.total, 0);
+
+      const payload = {
+        customerId: editCustomer,
+        executionFirmId: editFirm || null,
+        expectedPaymentDate: editExpectedPaymentDate ? new Date(editExpectedPaymentDate).toISOString() : null,
+        deliveryAddress: editDeliveryAddress,
+        dispatchLocation: editDispatchLocation,
+        plantName: editPlantName,
+        requiredDeliveryDate: editRequiredDeliveryDate ? new Date(editRequiredDeliveryDate).toISOString() : null,
+        estimatedFreight: editEstimatedFreight,
+        advanceAmount: editAdvanceAmount,
+        totalOrderValue: totalVal,
+        balanceAmount: totalVal - editAdvanceAmount,
+        remarks: editRemarks,
+        products: mappedProducts
+      };
+
+      const res = await api.put(`/orders/${orderId}`, payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Order updated successfully!");
+      setIsEditingOrder(false);
+      queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || "Failed to update order");
+    }
+  });
 
   // Fetch Invoices and Payments client-side filtering
   const { data: invoices = [] } = useQuery({
@@ -233,6 +345,7 @@ function OrderDetail() {
     { id: "logistics", label: "Logistics Desk" },
     { id: "dispatch", label: "Dispatch Copy" },
     { id: "invoice", label: "Invoice & Payments" },
+    { id: "history", label: "Order History" },
   ];
 
   return (
@@ -262,6 +375,16 @@ function OrderDetail() {
 
         {/* Action Controls based on Roles / Status */}
         <div className="flex flex-wrap gap-2">
+          {isSuperAdminOrAdmin && (
+            <button
+              onClick={() => setIsEditingOrder(true)}
+              className="bg-white border border-wireframe-border hover:bg-wireframe-bg-alt text-on-surface px-4 py-2 rounded-md font-semibold flex items-center gap-1.5 shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[20px]">edit</span>
+              Edit Order
+            </button>
+          )}
+
           {order.status === "DRAFT" && (
             <button
               onClick={() => statusMutation.mutate({ status: "PENDING_MD_APPROVAL", remarks: "Submitting draft for approval" })}
@@ -383,11 +506,20 @@ function OrderDetail() {
               )}
 
               {/* Order Dates Details */}
-              <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm p-5 grid grid-cols-2 gap-4">
+              <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm p-5 grid grid-cols-3 gap-4">
                 <div>
                   <span className="text-xs text-muted-foreground">Required Delivery Date</span>
                   <p className="font-semibold mt-1">
                     {order.requiredDeliveryDate ? new Date(order.requiredDeliveryDate).toLocaleDateString() : "-"}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Expected Payment Date</span>
+                  <p className={`font-semibold mt-1 ${isPaymentOverdue ? 'text-red-600 font-bold flex items-center gap-1.5' : ''}`}>
+                    {order.expectedPaymentDate ? new Date(order.expectedPaymentDate).toLocaleDateString() : "-"}
+                    {isPaymentOverdue && (
+                      <span className="bg-red-100 text-red-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase inline-block">Overdue</span>
+                    )}
                   </p>
                 </div>
                 <div>
@@ -812,7 +944,344 @@ function OrderDetail() {
             )}
           </div>
         )}
+
+        {/* TAB 5: ORDER HISTORY TIMELINE */}
+        {activeTab === "history" && (
+          <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm p-6 animate-in fade-in duration-200">
+            <h3 className="font-semibold text-lg border-b border-wireframe-border pb-2 mb-6">Order Activity & Status Timeline</h3>
+            {!order.statusHistory || order.statusHistory.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <span className="material-symbols-outlined text-[48px] text-muted-foreground/30 mb-2">history</span>
+                <p>No activity history logged for this order.</p>
+              </div>
+            ) : (
+              <div className="relative border-l border-wireframe-border ml-4 pl-6 space-y-6">
+                {order.statusHistory.map((item: any, idx: number) => {
+                  const isDelivered = item.status === 'DELIVERED';
+                  const isShipped = item.status === 'SHIPPED';
+                  const isApproved = item.status === 'APPROVED';
+                  const isDraft = item.status === 'DRAFT';
+                  const isRejected = item.status === 'REJECTED';
+
+                  return (
+                    <div key={idx} className="relative">
+                      {/* Timeline dot */}
+                      <span className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-2 border-white shadow-sm flex items-center justify-center ${
+                        isDelivered ? 'bg-green-600' :
+                        isRejected ? 'bg-red-600' :
+                        isApproved ? 'bg-purple-600' :
+                        isShipped ? 'bg-blue-600' :
+                        isDraft ? 'bg-gray-400' :
+                        'bg-yellow-500'
+                      }`}></span>
+
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-1">
+                        <div>
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold mr-2 ${
+                            isDelivered ? 'bg-green-100 text-green-800' :
+                            isRejected ? 'bg-red-100 text-red-800' :
+                            isApproved ? 'bg-purple-100 text-purple-800' :
+                            isShipped ? 'bg-blue-100 text-blue-800' :
+                            isDraft ? 'bg-gray-100 text-gray-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {item.status}
+                          </span>
+                          <span className="text-sm font-semibold text-foreground">
+                            by {item.updatedByName || "User"}
+                          </span>
+                          <p className="text-sm text-on-surface mt-1 bg-wireframe-bg-alt/30 p-2.5 rounded border border-wireframe-border/50 max-w-2xl">
+                            {item.remarks || "No remarks provided"}
+                          </p>
+                        </div>
+                        <div className="text-xs text-outline whitespace-nowrap mt-1 md:mt-0 font-medium">
+                          {new Date(item.updatedAt).toLocaleString("en-IN")}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Edit Order Modal Dialog */}
+      {isEditingOrder && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg border border-wireframe-border shadow-xl max-w-4xl w-full p-6 animate-in zoom-in-95 duration-150 my-8">
+            <div className="flex items-center justify-between border-b border-wireframe-border pb-4 mb-4">
+              <h3 className="font-bold text-xl text-foreground">Edit Order Details: {order.orderNumber}</h3>
+              <button onClick={() => setIsEditingOrder(false)} className="text-muted-foreground hover:text-foreground">
+                <span className="material-symbols-outlined text-[24px]">close</span>
+              </button>
+            </div>
+            
+            <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+              {/* Section 1: Core Order & Firm Details */}
+              <div className="border border-wireframe-border rounded p-4 bg-wireframe-bg-alt/10 space-y-4">
+                <h4 className="font-bold text-sm text-primary uppercase tracking-wider">1. Customer, Firm & Payment Date</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Select Customer *</label>
+                    <select
+                      className="w-full border border-input bg-background rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      value={editCustomer}
+                      onChange={(e) => setEditCustomer(e.target.value)}
+                    >
+                      <option value="">Select Customer...</option>
+                      {customers.map((c: any) => (
+                        <option key={c._id} value={c._id}>{c.companyName} ({c.customerCode || "No Code"})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Execution Firm</label>
+                    <select
+                      className="w-full border border-input bg-background rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      value={editFirm}
+                      onChange={(e) => setEditFirm(e.target.value)}
+                    >
+                      <option value="">Select Firm</option>
+                      {firms.map((f: any) => (
+                        <option key={f._id} value={f._id}>{f.firmName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-primary">Expected Payment Date (Reminder Deadline) *</label>
+                    <input
+                      type="date"
+                      className="w-full border border-primary/30 bg-background rounded px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
+                      value={editExpectedPaymentDate}
+                      onChange={(e) => setEditExpectedPaymentDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Delivery & Dispatch details */}
+              <div className="border border-wireframe-border rounded p-4 bg-wireframe-bg-alt/10 space-y-4">
+                <h4 className="font-bold text-sm text-primary uppercase tracking-wider">2. Delivery & Dispatch Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Delivery Address</label>
+                    <textarea
+                      className="w-full border border-input bg-background rounded px-3 py-2 text-sm min-h-[90px] focus:outline-none focus:ring-2 focus:ring-primary"
+                      value={editDeliveryAddress}
+                      onChange={(e) => setEditDeliveryAddress(e.target.value)}
+                      placeholder="Enter delivery address..."
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold">Plant Name</label>
+                        <input
+                          type="text"
+                          className="w-full border border-input bg-background rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          value={editPlantName}
+                          onChange={(e) => setEditPlantName(e.target.value)}
+                          placeholder="e.g. Plant A"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold">Dispatch Location</label>
+                        <input
+                          type="text"
+                          className="w-full border border-input bg-background rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          value={editDispatchLocation}
+                          onChange={(e) => setEditDispatchLocation(e.target.value)}
+                          placeholder="e.g. Gate 1"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold">Required Delivery Date</label>
+                        <input
+                          type="date"
+                          className="w-full border border-input bg-background rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          value={editRequiredDeliveryDate}
+                          onChange={(e) => setEditRequiredDeliveryDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold">Estimated Freight (₹)</label>
+                        <input
+                          type="number"
+                          className="w-full border border-input bg-background rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          value={editEstimatedFreight || ""}
+                          onChange={(e) => setEditEstimatedFreight(Number(e.target.value))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Product rows */}
+              <div className="border border-wireframe-border rounded p-4 bg-wireframe-bg-alt/10 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-bold text-sm text-primary uppercase tracking-wider">3. Products Details</h4>
+                  <button
+                    type="button"
+                    onClick={() => setEditProducts([...editProducts, { id: Date.now(), productName: "", quantity: 0, unit: "tons", rate: 0, total: 0 }])}
+                    className="text-xs text-primary font-bold hover:underline flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add_circle</span> Add Product
+                  </button>
+                </div>
+                <div className="border border-wireframe-border rounded overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-wireframe-bg-alt/50 border-b border-wireframe-border">
+                      <tr>
+                        <th className="px-3 py-2 font-semibold w-[40%]">Product Name</th>
+                        <th className="px-3 py-2 font-semibold">Quantity</th>
+                        <th className="px-3 py-2 font-semibold w-24">Unit</th>
+                        <th className="px-3 py-2 font-semibold">Rate (₹)</th>
+                        <th className="px-3 py-2 font-semibold">Total (₹)</th>
+                        <th className="px-3 py-2 font-semibold text-center w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editProducts.map((p, index) => (
+                        <tr key={p.id} className="border-b border-wireframe-border last:border-0 bg-white">
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                              value={p.productName}
+                              onChange={(e) => {
+                                const newP = [...editProducts];
+                                newP[index].productName = e.target.value;
+                                setEditProducts(newP);
+                              }}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                              value={p.quantity || ""}
+                              onChange={(e) => {
+                                const newP = [...editProducts];
+                                newP[index].quantity = Number(e.target.value);
+                                newP[index].total = newP[index].quantity * newP[index].rate;
+                                setEditProducts(newP);
+                              }}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              className="w-full border border-input bg-background rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                              value={p.unit}
+                              onChange={(e) => {
+                                const newP = [...editProducts];
+                                newP[index].unit = e.target.value;
+                                setEditProducts(newP);
+                              }}
+                            >
+                              <option value="tons">tons</option>
+                              <option value="kg">kg</option>
+                              <option value="bags">bags</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                              value={p.rate || ""}
+                              onChange={(e) => {
+                                const newP = [...editProducts];
+                                newP[index].rate = Number(e.target.value);
+                                newP[index].total = newP[index].quantity * newP[index].rate;
+                                setEditProducts(newP);
+                              }}
+                            />
+                          </td>
+                          <td className="px-3 py-2 font-medium bg-wireframe-bg-alt/10">
+                            ₹{(p.quantity * p.rate).toLocaleString("en-IN")}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newP = [...editProducts];
+                                newP.splice(index, 1);
+                                setEditProducts(newP.length > 0 ? newP : [{ id: 1, productName: "", quantity: 0, unit: "tons", rate: 0, total: 0 }]);
+                              }}
+                              disabled={editProducts.length === 1}
+                              className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">delete</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Section 4: Advance Amount & Calculations */}
+              <div className="border border-wireframe-border rounded p-4 bg-wireframe-bg-alt/10 space-y-4">
+                <h4 className="font-bold text-sm text-primary uppercase tracking-wider">4. Financial Totals</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white p-3 border border-wireframe-border rounded flex flex-col justify-center">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Total Order Value (Calculated)</span>
+                    <span className="text-xl font-bold">₹{editProducts.reduce((acc, p) => acc + (p.quantity * p.rate), 0).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold">Advance Payment Received (₹)</label>
+                    <input
+                      type="number"
+                      className="w-full border border-input bg-background rounded px-3 py-2 text-sm font-semibold focus:outline-none"
+                      value={editAdvanceAmount || ""}
+                      onChange={(e) => setEditAdvanceAmount(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="bg-red-50 p-3 border border-red-100 rounded flex flex-col justify-center">
+                    <span className="text-[10px] uppercase font-bold text-red-600">Balance Outstanding (Calculated)</span>
+                    <span className="text-xl font-bold text-red-700">
+                      ₹{(editProducts.reduce((acc, p) => acc + (p.quantity * p.rate), 0) - editAdvanceAmount).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold">Remarks / Internal Notes</label>
+                <textarea
+                  className="w-full border border-input bg-background rounded px-3 py-2 text-sm min-h-[60px]"
+                  value={editRemarks}
+                  onChange={(e) => setEditRemarks(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 border-t border-wireframe-border pt-4 mt-4">
+              <button
+                type="button"
+                onClick={() => setIsEditingOrder(false)}
+                className="px-4 py-2 border border-wireframe-border rounded-md text-sm font-medium hover:bg-wireframe-bg-alt"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => updateOrderMutation.mutate()}
+                disabled={updateOrderMutation.isPending}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 px-5 py-2 rounded-md text-sm font-semibold flex items-center gap-1.5 disabled:opacity-70 shadow"
+              >
+                {updateOrderMutation.isPending ? "Saving..." : "Save Order Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status Transition Remarks Modal Dialog */}
       {isShowingStatusModal && (
