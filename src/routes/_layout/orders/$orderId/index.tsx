@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -16,6 +16,8 @@ function OrderDetail() {
   const { user } = useAuth();
   const normalizedRole = (user?.role || "").toLowerCase().replace(/[\s_-]/g, "");
   const isSuperAdminOrAdmin = normalizedRole === "superadmin" || normalizedRole === "admin";
+  const isMD = normalizedRole === "md" || normalizedRole === "cmd" || normalizedRole === "managingdirector";
+  const canEditOrder = isSuperAdminOrAdmin || isMD;
   const isOperations = normalizedRole === "operations" || normalizedRole === "volunteer";
   const isAccounts = normalizedRole === "accounts" || normalizedRole === "citizen" || normalizedRole === "accountant";
   const [activeTab, setActiveTab] = useState("overview");
@@ -96,6 +98,11 @@ function OrderDetail() {
     order.paymentStatus !== "PAID" &&
     order.status !== "PAID";
 
+  const totalMarginEarned = useMemo(() => {
+    if (!order || !order.products) return 0;
+    return order.products.reduce((acc: number, curr: any) => acc + ((curr.quantity || 0) * (curr.margin || 0)), 0);
+  }, [order]);
+
   useEffect(() => {
     if (order) {
       setEditCustomer(order.customerId?._id || order.customerId || "");
@@ -114,12 +121,50 @@ function OrderDetail() {
         productName: p.productName,
         quantity: p.quantity,
         unit: p.unit,
-        rate: p.rate,
-        total: p.total
+        supplyRate: p.supplyRate || 0,
+        freight: p.freight || 0,
+        margin: p.margin || 0,
+        gstPercent: p.gstPercent || 0,
+        gstAmount: p.gstAmount || 0,
+        rate: p.rate || 0,
+        total: p.total || 0
       }));
-      setEditProducts(mappedProducts.length > 0 ? mappedProducts : [{ id: 1, productName: "", quantity: 0, unit: "tons", rate: 0, total: 0 }]);
+      setEditProducts(mappedProducts.length > 0 ? mappedProducts : [{ id: 1, productName: "", quantity: 0, unit: "tons", supplyRate: 0, freight: 0, margin: 0, gstPercent: 0, gstAmount: 0, rate: 0, total: 0 }]);
     }
   }, [order, isEditingOrder]);
+
+  const handleEditProductChange = (index: number, field: string, value: any) => {
+    const newP = [...editProducts];
+    const row = { ...newP[index] };
+    
+    if (field === "productName" || field === "unit") {
+      row[field] = value;
+    } else {
+      row[field] = Number(value);
+    }
+
+    const quantity = Number(row.quantity || 0);
+    const supplyRate = Number(row.supplyRate || 0);
+    const freight = Number(row.freight || 0);
+    const gstPercent = Number(row.gstPercent || 0);
+
+    if (field === "rate") {
+      const rate = Number(value || 0);
+      const baseRate = rate / (1 + gstPercent / 100);
+      row.margin = Number((baseRate - supplyRate - freight).toFixed(2));
+      row.gstAmount = Number((baseRate * (gstPercent / 100)).toFixed(2));
+    } else {
+      const margin = Number(row.margin || 0);
+      const baseRate = supplyRate + freight + margin;
+      const gstAmount = baseRate * (gstPercent / 100);
+      row.gstAmount = Number(gstAmount.toFixed(2));
+      row.rate = Number((baseRate + gstAmount).toFixed(2));
+    }
+    
+    row.total = Number((quantity * (row.rate || 0)).toFixed(2));
+    newP[index] = row;
+    setEditProducts(newP);
+  };
 
   const updateOrderMutation = useMutation({
     mutationFn: async () => {
@@ -129,8 +174,13 @@ function OrderDetail() {
           productName: p.productName,
           quantity: p.quantity,
           unit: p.unit,
+          supplyRate: p.supplyRate,
+          freight: p.freight,
+          margin: p.margin,
+          gstPercent: p.gstPercent,
+          gstAmount: p.gstAmount,
           rate: p.rate,
-          total: p.quantity * p.rate
+          total: p.total
         }));
 
       if (mappedProducts.length === 0) {
@@ -388,7 +438,7 @@ function OrderDetail() {
 
         {/* Action Controls based on Roles / Status */}
         <div className="flex flex-wrap gap-2">
-          {isSuperAdminOrAdmin && (
+          {canEditOrder && (
             <button
               onClick={() => setIsEditingOrder(true)}
               className="bg-white border border-wireframe-border hover:bg-wireframe-bg-alt text-on-surface px-4 py-2 rounded-md font-semibold flex items-center gap-1.5 shadow-sm"
@@ -482,32 +532,44 @@ function OrderDetail() {
                 <div className="px-4 py-3 bg-wireframe-bg-alt/50 border-b border-wireframe-border font-medium">
                   Ordered Products
                 </div>
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-wireframe-bg-alt/30 border-b border-wireframe-border text-muted-foreground text-xs uppercase">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Product</th>
-                      <th className="px-4 py-3 font-medium">Qty</th>
-                      <th className="px-4 py-3 font-medium">Rate</th>
-                      <th className="px-4 py-3 font-medium text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {order.products?.map((item: any, idx: number) => (
-                      <tr key={item._id || idx} className="border-b border-wireframe-border">
-                        <td className="px-4 py-3 font-medium">{item.productName}</td>
-                        <td className="px-4 py-3">{item.quantity} {item.unit || "tons"}</td>
-                        <td className="px-4 py-3">₹{(item.rate || 0).toLocaleString("en-IN")}</td>
-                        <td className="px-4 py-3 text-right font-medium">₹{(item.total || 0).toLocaleString("en-IN")}</td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left min-w-[850px]">
+                    <thead className="bg-wireframe-bg-alt/30 border-b border-wireframe-border text-muted-foreground text-xs uppercase">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Product</th>
+                        <th className="px-4 py-3 font-medium">Qty</th>
+                        <th className="px-4 py-3 font-medium">Supply Rate</th>
+                        <th className="px-4 py-3 font-medium">Freight</th>
+                        <th className="px-4 py-3 font-medium">Margin</th>
+                        <th className="px-4 py-3 font-medium">GST %</th>
+                        <th className="px-4 py-3 font-medium">GST Amt</th>
+                        <th className="px-4 py-3 font-medium">Selling Rate</th>
+                        <th className="px-4 py-3 font-medium text-right">Total</th>
                       </tr>
-                    ))}
-                    <tr className="bg-wireframe-bg-alt/20">
-                      <td colSpan={3} className="px-4 py-3 text-right font-semibold">Total Order Value</td>
-                      <td className="px-4 py-3 text-right font-bold text-primary text-base">
-                        ₹{(order.totalOrderValue || 0).toLocaleString("en-IN")}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {order.products?.map((item: any, idx: number) => (
+                        <tr key={item._id || idx} className="border-b border-wireframe-border">
+                          <td className="px-4 py-3 font-medium">{item.productName}</td>
+                          <td className="px-4 py-3">{item.quantity} {item.unit || "tons"}</td>
+                          <td className="px-4 py-3">₹{(item.supplyRate || 0).toLocaleString("en-IN")}</td>
+                          <td className="px-4 py-3">₹{(item.freight || 0).toLocaleString("en-IN")}</td>
+                          <td className="px-4 py-3 font-semibold text-green-700">₹{(item.margin || 0).toLocaleString("en-IN")}</td>
+                          <td className="px-4 py-3">{item.gstPercent || 0}%</td>
+                          <td className="px-4 py-3">₹{(item.gstAmount || 0).toLocaleString("en-IN")}</td>
+                          <td className="px-4 py-3 font-medium">₹{(item.rate || 0).toLocaleString("en-IN")}</td>
+                          <td className="px-4 py-3 text-right font-medium">₹{(item.total || 0).toLocaleString("en-IN")}</td>
+                        </tr>
+                      ))}
+                      <tr className="bg-wireframe-bg-alt/20 border-t border-wireframe-border">
+                        <td colSpan={8} className="px-4 py-3 text-right font-semibold">Total Order Value</td>
+                        <td className="px-4 py-3 text-right font-bold text-primary text-base">
+                          ₹{(order.totalOrderValue || 0).toLocaleString("en-IN")}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {/* Remarks */}
@@ -581,6 +643,10 @@ function OrderDetail() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Order Value:</span>
                     <span className="font-semibold text-foreground">₹{(order.totalOrderValue || 0).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-green-700 bg-green-50 p-1.5 rounded border border-green-100/50">
+                    <span className="font-semibold">Est. Margin Earned:</span>
+                    <span className="font-bold">₹{totalMarginEarned.toLocaleString("en-IN")}</span>
                   </div>
                   
                   {/* Transport / Freight cost details */}
@@ -1248,21 +1314,25 @@ function OrderDetail() {
                   <h4 className="font-bold text-sm text-primary uppercase tracking-wider">3. Products Details</h4>
                   <button
                     type="button"
-                    onClick={() => setEditProducts([...editProducts, { id: Date.now(), productName: "", quantity: 0, unit: "tons", rate: 0, total: 0 }])}
+                    onClick={() => setEditProducts([...editProducts, { id: Date.now(), productName: "", quantity: 0, unit: "tons", supplyRate: 0, freight: 0, margin: 0, gstPercent: 0, gstAmount: 0, rate: 0, total: 0 }])}
                     className="text-xs text-primary font-bold hover:underline flex items-center gap-1"
                   >
                     <span className="material-symbols-outlined text-[16px]">add_circle</span> Add Product
                   </button>
                 </div>
-                <div className="border border-wireframe-border rounded overflow-hidden">
-                  <table className="w-full text-xs text-left">
+                <div className="border border-wireframe-border rounded overflow-x-auto">
+                  <table className="w-full text-xs text-left min-w-[850px]">
                     <thead className="bg-wireframe-bg-alt/50 border-b border-wireframe-border">
                       <tr>
-                        <th className="px-3 py-2 font-semibold w-[40%]">Product Name</th>
+                        <th className="px-3 py-2 font-semibold w-[22%]">Product Name</th>
                         <th className="px-3 py-2 font-semibold">Quantity</th>
-                        <th className="px-3 py-2 font-semibold w-24">Unit</th>
-                        <th className="px-3 py-2 font-semibold">Rate (₹)</th>
-                        <th className="px-3 py-2 font-semibold">Total (₹)</th>
+                        <th className="px-3 py-2 font-semibold w-20">Unit</th>
+                        <th className="px-3 py-2 font-semibold">Supply Rate (₹)</th>
+                        <th className="px-3 py-2 font-semibold">Freight (₹)</th>
+                        <th className="px-3 py-2 font-semibold">Margin (₹)</th>
+                        <th className="px-3 py-2 font-semibold">GST %</th>
+                        <th className="px-3 py-2 font-semibold">Selling Rate (₹)</th>
+                        <th className="px-3 py-2 font-semibold text-right">Total (₹)</th>
                         <th className="px-3 py-2 font-semibold text-center w-8"></th>
                       </tr>
                     </thead>
@@ -1286,12 +1356,7 @@ function OrderDetail() {
                               type="number"
                               className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
                               value={p.quantity || ""}
-                              onChange={(e) => {
-                                const newP = [...editProducts];
-                                newP[index].quantity = Number(e.target.value);
-                                newP[index].total = newP[index].quantity * newP[index].rate;
-                                setEditProducts(newP);
-                              }}
+                              onChange={(e) => handleEditProductChange(index, "quantity", e.target.value)}
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -1312,18 +1377,45 @@ function OrderDetail() {
                           <td className="px-3 py-2">
                             <input
                               type="number"
-                              className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-                              value={p.rate || ""}
-                              onChange={(e) => {
-                                const newP = [...editProducts];
-                                newP[index].rate = Number(e.target.value);
-                                newP[index].total = newP[index].quantity * newP[index].rate;
-                                setEditProducts(newP);
-                              }}
+                              className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none"
+                              value={p.supplyRate || ""}
+                              onChange={(e) => handleEditProductChange(index, "supplyRate", e.target.value)}
                             />
                           </td>
-                          <td className="px-3 py-2 font-medium bg-wireframe-bg-alt/10">
-                            ₹{(p.quantity * p.rate).toLocaleString("en-IN")}
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none"
+                              value={p.freight || ""}
+                              onChange={(e) => handleEditProductChange(index, "freight", e.target.value)}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none"
+                              value={p.margin || ""}
+                              onChange={(e) => handleEditProductChange(index, "margin", e.target.value)}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none"
+                              value={p.gstPercent || ""}
+                              onChange={(e) => handleEditProductChange(index, "gstPercent", e.target.value)}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none"
+                              value={p.rate || ""}
+                              onChange={(e) => handleEditProductChange(index, "rate", e.target.value)}
+                            />
+                          </td>
+                          <td className="px-3 py-2 font-medium bg-wireframe-bg-alt/10 text-right">
+                            ₹{(p.total || 0).toLocaleString("en-IN")}
                           </td>
                           <td className="px-3 py-2 text-center">
                             <button
@@ -1331,7 +1423,7 @@ function OrderDetail() {
                               onClick={() => {
                                 const newP = [...editProducts];
                                 newP.splice(index, 1);
-                                setEditProducts(newP.length > 0 ? newP : [{ id: 1, productName: "", quantity: 0, unit: "tons", rate: 0, total: 0 }]);
+                                setEditProducts(newP.length > 0 ? newP : [{ id: 1, productName: "", quantity: 0, unit: "tons", supplyRate: 0, freight: 0, margin: 0, gstPercent: 0, gstAmount: 0, rate: 0, total: 0 }]);
                               }}
                               disabled={editProducts.length === 1}
                               className="text-red-500 hover:text-red-700 disabled:opacity-50"

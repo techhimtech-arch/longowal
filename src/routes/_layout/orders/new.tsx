@@ -14,7 +14,13 @@ interface ProductRow {
   productName: string;
   quantity: number;
   unit: string;
+  supplyRate: number;
+  freight: number;
+  margin: number;
+  gstPercent: number;
+  gstAmount: number;
   rate: number;
+  total: number;
 }
 
 function CreateOrder() {
@@ -38,7 +44,7 @@ function CreateOrder() {
 
   // Products rows
   const [products, setProducts] = useState<ProductRow[]>([
-    { id: 1, productName: "", quantity: 0, unit: "tons", rate: 0 }
+    { id: 1, productName: "", quantity: 0, unit: "tons", supplyRate: 0, freight: 0, margin: 0, gstPercent: 0, gstAmount: 0, rate: 0, total: 0 }
   ]);
 
   // Fetch Customers list
@@ -74,15 +80,39 @@ function CreateOrder() {
 
   const handleProductChange = (index: number, field: keyof ProductRow, value: string | number) => {
     const newProducts = [...products];
-    newProducts[index] = { 
-      ...newProducts[index], 
-      [field]: field === "quantity" || field === "rate" ? Number(value) : value 
-    };
+    const row = { ...newProducts[index] };
+    
+    if (field === "productName" || field === "unit") {
+      row[field] = value as any;
+    } else {
+      row[field] = Number(value) as any;
+    }
+
+    const quantity = Number(row.quantity || 0);
+    const supplyRate = Number(row.supplyRate || 0);
+    const freight = Number(row.freight || 0);
+    const gstPercent = Number(row.gstPercent || 0);
+
+    if (field === "rate") {
+      const rate = Number(value || 0);
+      const baseRate = rate / (1 + gstPercent / 100);
+      row.margin = Number((baseRate - supplyRate - freight).toFixed(2));
+      row.gstAmount = Number((baseRate * (gstPercent / 100)).toFixed(2));
+    } else {
+      const margin = Number(row.margin || 0);
+      const baseRate = supplyRate + freight + margin;
+      const gstAmount = baseRate * (gstPercent / 100);
+      row.gstAmount = Number(gstAmount.toFixed(2));
+      row.rate = Number((baseRate + gstAmount).toFixed(2));
+    }
+    
+    row.total = Number((quantity * (row.rate || 0)).toFixed(2));
+    newProducts[index] = row;
     setProducts(newProducts);
   };
 
   const addProduct = () => {
-    setProducts([...products, { id: Date.now(), productName: "", quantity: 0, unit: "tons", rate: 0 }]);
+    setProducts([...products, { id: Date.now(), productName: "", quantity: 0, unit: "tons", supplyRate: 0, freight: 0, margin: 0, gstPercent: 0, gstAmount: 0, rate: 0, total: 0 }]);
   };
 
   const removeProduct = (index: number) => {
@@ -93,7 +123,7 @@ function CreateOrder() {
 
   // Calculations
   const totalOrderValue = useMemo(() => {
-    return products.reduce((acc, curr) => acc + (curr.quantity * curr.rate), 0);
+    return products.reduce((acc, curr) => acc + (curr.total || 0), 0);
   }, [products]);
 
   const balanceAmount = useMemo(() => {
@@ -110,8 +140,13 @@ function CreateOrder() {
           productName: p.productName,
           quantity: p.quantity,
           unit: p.unit,
+          supplyRate: p.supplyRate,
+          freight: p.freight,
+          margin: p.margin,
+          gstPercent: p.gstPercent,
+          gstAmount: p.gstAmount,
           rate: p.rate,
-          total: p.quantity * p.rate,
+          total: p.total,
         }));
 
       if (mappedProducts.length === 0) {
@@ -274,42 +309,46 @@ function CreateOrder() {
             </span>
           </div>
           <div className="p-4 space-y-4">
-            <div className="border border-wireframe-border rounded-md overflow-hidden">
-              <table className="w-full text-sm text-left">
+            <div className="border border-wireframe-border rounded-md overflow-x-auto">
+              <table className="w-full text-sm text-left min-w-[900px]">
                 <thead className="bg-wireframe-bg-alt/50 border-b border-wireframe-border">
                   <tr>
-                    <th className="px-4 py-3 font-medium w-[40%]">Product</th>
-                    <th className="px-4 py-3 font-medium">Quantity</th>
-                    <th className="px-4 py-3 font-medium">Unit</th>
-                    <th className="px-4 py-3 font-medium">Rate (₹)</th>
-                    <th className="px-4 py-3 font-medium">Total (₹)</th>
-                    <th className="px-4 py-3 font-medium text-center w-12"></th>
+                    <th className="px-3 py-2 font-medium w-[22%]">Product</th>
+                    <th className="px-3 py-2 font-medium w-[8%]">Quantity</th>
+                    <th className="px-3 py-2 font-medium w-[10%]">Unit</th>
+                    <th className="px-3 py-2 font-medium w-[11%]">Supply Rate (₹)</th>
+                    <th className="px-3 py-2 font-medium w-[10%]">Freight (₹)</th>
+                    <th className="px-3 py-2 font-medium w-[10%]">Margin (₹)</th>
+                    <th className="px-3 py-2 font-medium w-[8%]">GST %</th>
+                    <th className="px-3 py-2 font-medium w-[11%]">Selling Rate (₹)</th>
+                    <th className="px-3 py-2 font-medium w-[10%] text-right font-semibold">Total (₹)</th>
+                    <th className="px-3 py-2 font-medium text-center w-8"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {products.map((item, index) => (
                     <tr key={item.id} className="border-b border-wireframe-border last:border-b-0">
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         <input
                           type="text"
-                          className="w-full border border-input bg-background rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
                           placeholder="e.g. Poultry Feed Mash"
                           value={item.productName}
                           onChange={(e) => handleProductChange(index, "productName", e.target.value)}
                         />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         <input 
                           type="number" 
                           min="0"
-                          className="w-full border border-input bg-background rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
                           value={item.quantity || ""}
                           onChange={(e) => handleProductChange(index, "quantity", e.target.value)}
                         />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         <select 
-                          className="w-full border border-input bg-background rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full border border-input bg-background rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
                           value={item.unit}
                           onChange={(e) => handleProductChange(index, "unit", e.target.value)}
                         >
@@ -318,19 +357,64 @@ function CreateOrder() {
                           <option value="bags">bags</option>
                         </select>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         <input 
                           type="number" 
                           min="0"
-                          className="w-full border border-input bg-background rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          step="0.01"
+                          placeholder="0"
+                          className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={item.supplyRate || ""}
+                          onChange={(e) => handleProductChange(index, "supplyRate", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input 
+                          type="number" 
+                          min="0"
+                          step="0.01"
+                          placeholder="0"
+                          className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={item.freight || ""}
+                          onChange={(e) => handleProductChange(index, "freight", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          placeholder="0"
+                          className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={item.margin || ""}
+                          onChange={(e) => handleProductChange(index, "margin", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input 
+                          type="number" 
+                          min="0"
+                          max="100"
+                          placeholder="0"
+                          className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={item.gstPercent || ""}
+                          onChange={(e) => handleProductChange(index, "gstPercent", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input 
+                          type="number" 
+                          min="0"
+                          step="0.01"
+                          placeholder="0"
+                          className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
                           value={item.rate || ""}
                           onChange={(e) => handleProductChange(index, "rate", e.target.value)}
                         />
                       </td>
-                      <td className="px-4 py-3 font-medium bg-wireframe-bg-alt/30">
-                        ₹{(item.quantity * item.rate).toLocaleString("en-IN")}
+                      <td className="px-3 py-2 font-medium bg-wireframe-bg-alt/30 text-right">
+                        ₹{(item.total || 0).toLocaleString("en-IN")}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-2 text-center">
                         <button 
                           onClick={() => removeProduct(index)}
                           className="text-red-500 hover:text-red-700 p-1"
