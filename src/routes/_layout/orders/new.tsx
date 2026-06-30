@@ -65,6 +65,24 @@ function CreateOrder() {
     }
   });
 
+  // Fetch Master Plants
+  const { data: masterPlants = [] } = useQuery({
+    queryKey: ["masterPlants"],
+    queryFn: async () => {
+      const res = await api.get("/masters?category=PLANT");
+      return res.data?.data || [];
+    }
+  });
+
+  // Fetch Master Products
+  const { data: masterProducts = [] } = useQuery({
+    queryKey: ["masterProducts"],
+    queryFn: async () => {
+      const res = await api.get("/masters?category=PRODUCT");
+      return res.data?.data || [];
+    }
+  });
+
   // Fetch users for assignment dropdown
   const { data: users = [] } = useQuery({
     queryKey: ["users"],
@@ -329,13 +347,34 @@ function CreateOrder() {
                   {products.map((item, index) => (
                     <tr key={item.id} className="border-b border-wireframe-border last:border-b-0">
                       <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-                          placeholder="e.g. Poultry Feed Mash"
+                        <select
+                          className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary font-medium"
                           value={item.productName}
-                          onChange={(e) => handleProductChange(index, "productName", e.target.value)}
-                        />
+                          onChange={(e) => {
+                            const prodName = e.target.value;
+                            const match = masterProducts.find((p: any) => p.key === prodName);
+                            if (match) {
+                              const newProducts = [...products];
+                              newProducts[index] = {
+                                ...newProducts[index],
+                                productName: prodName,
+                                unit: match.value?.defaultUnit || "tons",
+                                gstPercent: match.value?.defaultGstPercent || 0
+                              };
+                              setProducts(newProducts);
+                              handleProductChange(index, "productName", prodName);
+                            } else {
+                              handleProductChange(index, "productName", prodName);
+                            }
+                          }}
+                        >
+                          <option value="">Select Product</option>
+                          {masterProducts.map((p: any) => (
+                            <option key={p._id} value={p.key}>
+                              {p.value?.name || p.key}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td className="px-3 py-2">
                         <input 
@@ -468,14 +507,19 @@ function CreateOrder() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Plant Name</label>
-                <input 
-                  type="text" 
+                <label className="text-sm font-medium">Plant Name *</label>
+                <select
                   className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g. Plant A"
                   value={plantName}
                   onChange={(e) => setPlantName(e.target.value)}
-                />
+                >
+                  <option value="">Select Loading Plant</option>
+                  {masterPlants.map((p: any) => (
+                    <option key={p._id} value={p.key}>
+                      {p.value?.name || p.key}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Required Delivery Date</label>
