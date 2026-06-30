@@ -199,18 +199,28 @@ function OrderDetail() {
 
     if (field === "rate") {
       const rate = Number(value || 0);
-      const baseRate = rate / (1 + gstPercent / 100);
-      row.margin = Number((baseRate - supplyRate - freight).toFixed(2));
-      row.gstAmount = Number((baseRate * (gstPercent / 100)).toFixed(2));
+      const total = quantity * rate;
+      const supplyValue = quantity * supplyRate;
+      const baseCostGst = supplyValue + freight;
+      const gstAmount = baseCostGst * (gstPercent / 100);
+      const margin = total - baseCostGst - gstAmount;
+      
+      row.gstAmount = Number(gstAmount.toFixed(2));
+      row.margin = Number(margin.toFixed(2));
+      row.total = Number(total.toFixed(2));
+      row.rate = rate;
     } else {
       const margin = Number(row.margin || 0);
-      const baseRate = supplyRate + freight + margin;
-      const gstAmount = baseRate * (gstPercent / 100);
+      const supplyValue = quantity * supplyRate;
+      const baseCostGst = supplyValue + freight;
+      const gstAmount = baseCostGst * (gstPercent / 100);
+      const total = baseCostGst + gstAmount + margin;
+      
       row.gstAmount = Number(gstAmount.toFixed(2));
-      row.rate = Number((baseRate + gstAmount).toFixed(2));
+      row.total = Number(total.toFixed(2));
+      row.rate = quantity > 0 ? Number((total / quantity).toFixed(2)) : 0;
     }
     
-    row.total = Number((quantity * (row.rate || 0)).toFixed(2));
     newP[index] = row;
     setEditProducts(newP);
   };
