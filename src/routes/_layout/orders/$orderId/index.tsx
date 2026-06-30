@@ -48,6 +48,18 @@ function OrderDetail() {
   const [isShowingStatusModal, setIsShowingStatusModal] = useState(false);
   const [targetStatus, setTargetStatus] = useState("");
 
+  // Add Dispatch form state
+  const [isAddingDispatch, setIsAddingDispatch] = useState(false);
+  const [newDispatchVehicleNumber, setNewDispatchVehicleNumber] = useState("");
+  const [newDispatchTransporterName, setNewDispatchTransporterName] = useState("");
+  const [newDispatchDriverName, setNewDispatchDriverName] = useState("");
+  const [newDispatchDriverMobile, setNewDispatchDriverMobile] = useState("");
+  const [newDispatchLrNumber, setNewDispatchLrNumber] = useState("");
+  const [newDispatchFreightCost, setNewDispatchFreightCost] = useState(0);
+  const [newDispatchLoadingCharges, setNewDispatchLoadingCharges] = useState(0);
+  const [newDispatchRemarks, setNewDispatchRemarks] = useState("");
+  const [newDispatchProducts, setNewDispatchProducts] = useState<any[]>([]);
+
   // Fetch single order details
   const { data: orderResponse, isLoading: isLoadingOrder, error: orderError } = useQuery({
     queryKey: ["order", orderId],
@@ -311,6 +323,96 @@ function OrderDetail() {
     onError: (err: any) => {
       toast.error(err.response?.data?.message || err.message || "Failed to update logistics details");
       console.error(err);
+    }
+  });
+
+  // Fetch Dispatches for this order
+  const { data: dispatchesResponse, isLoading: isLoadingDispatches } = useQuery({
+    queryKey: ["dispatches", orderId],
+    queryFn: async () => {
+      const res = await api.get(`/dispatches?orderId=${orderId}`);
+      return res.data;
+    },
+    enabled: !!orderId,
+  });
+  const dispatchesList = dispatchesResponse?.data || [];
+
+  // Sum dispatches helper variables
+  const totalActualFreight = useMemo(() => {
+    return dispatchesList.reduce((sum: number, d: any) => sum + (d.freightCost || 0), 0);
+  }, [dispatchesList]);
+
+  const totalActualLoading = useMemo(() => {
+    return dispatchesList.reduce((sum: number, d: any) => sum + (d.loadingCharges || 0), 0);
+  }, [dispatchesList]);
+
+  const logisticsFreightVal = dispatchesList.length > 0 ? totalActualFreight : (order?.estimatedFreight || 0);
+  const logisticsLoadingVal = totalActualLoading;
+
+  const getDispatchedQtyForProduct = (productName: string) => {
+    return dispatchesList.reduce((sum: number, d: any) => {
+      if (d.status === "REJECTED_FREIGHT") return sum;
+      const p = d.products?.find((prod: any) => prod.productName === productName);
+      return sum + (p?.quantity || 0);
+    }, 0);
+  };
+
+  // Set initial loaded products in add dispatch dialog
+  useEffect(() => {
+    if (isAddingDispatch && order?.products) {
+      const initialProducts = order.products.map((p: any) => {
+        const alreadyDispatched = getDispatchedQtyForProduct(p.productName);
+        const remaining = p.quantity - alreadyDispatched;
+        return {
+          productName: p.productName,
+          quantity: remaining > 0 ? remaining : 0,
+          totalOrdered: p.quantity,
+          alreadyDispatched
+        };
+      });
+      setNewDispatchProducts(initialProducts);
+    }
+  }, [isAddingDispatch, order, dispatchesResponse]);
+
+  // Mutation for creating a dispatch
+  const createDispatchMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const res = await api.post("/dispatches", payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Dispatch created successfully!");
+      setIsAddingDispatch(false);
+      setNewDispatchVehicleNumber("");
+      setNewDispatchTransporterName("");
+      setNewDispatchDriverName("");
+      setNewDispatchDriverMobile("");
+      setNewDispatchLrNumber("");
+      setNewDispatchFreightCost(0);
+      setNewDispatchLoadingCharges(0);
+      setNewDispatchRemarks("");
+      
+      queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+      queryClient.invalidateQueries({ queryKey: ["dispatches", orderId] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || "Failed to create dispatch");
+    }
+  });
+
+  // Mutation for updating dispatch status
+  const updateDispatchStatusMutation = useMutation({
+    mutationFn: async ({ dispatchId, status, remarks }: { dispatchId: string; status: string; remarks?: string }) => {
+      const res = await api.put(`/dispatches/${dispatchId}/status`, { status, remarks });
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success(`Dispatch status updated successfully!`);
+      queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+      queryClient.invalidateQueries({ queryKey: ["dispatches", orderId] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || "Failed to update dispatch status");
     }
   });
 
@@ -673,24 +775,24 @@ function OrderDetail() {
                   
                   {/* Transport / Freight cost details */}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      Freight Cost:
-                      {order.logistics?.freightCost ? (
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      Freight charges:
+                      {dispatchesList.length > 0 ? (
                         <span className="text-[10px] bg-green-100 text-green-800 px-1 rounded font-bold uppercase">Actual</span>
                       ) : (
                         <span className="text-[10px] bg-gray-100 text-gray-800 px-1 rounded font-bold uppercase">Est.</span>
                       )}
                     </span>
                     <span className="font-semibold text-foreground">
-                      ₹{(order.logistics?.freightCost || order.estimatedFreight || 0).toLocaleString("en-IN")}
+                      ₹{logisticsFreightVal.toLocaleString("en-IN")}
                     </span>
                   </div>
 
                   {/* Loading Charges if present */}
-                  {(order.logistics?.loadingCharges || 0) > 0 && (
+                  {logisticsLoadingVal > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Loading Charges:</span>
-                      <span className="font-semibold text-foreground">₹{order.logistics.loadingCharges.toLocaleString("en-IN")}</span>
+                      <span className="font-semibold text-foreground">₹{logisticsLoadingVal.toLocaleString("en-IN")}</span>
                     </div>
                   )}
 
@@ -710,8 +812,8 @@ function OrderDetail() {
                     <span>
                       ₹{(
                         (order.totalOrderValue || 0) +
-                        (order.logistics?.freightCost || order.estimatedFreight || 0) +
-                        (order.logistics?.loadingCharges || 0) +
+                        logisticsFreightVal +
+                        logisticsLoadingVal +
                         (order.logistics?.otherCharges || 0)
                       ).toLocaleString("en-IN")}
                     </span>
@@ -749,16 +851,16 @@ function OrderDetail() {
                     <span className={`text-base p-1 px-2.5 rounded ${
                       (
                         ((order.totalOrderValue || 0) +
-                        (order.logistics?.freightCost || order.estimatedFreight || 0) +
-                        (order.logistics?.loadingCharges || 0) +
+                        logisticsFreightVal +
+                        logisticsLoadingVal +
                         (order.logistics?.otherCharges || 0)) -
                         ((order.advanceAmount || 0) + outstandingSummary.received)
                       ) > 0 ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'
                     }`}>
                       ₹{(
                         ((order.totalOrderValue || 0) +
-                        (order.logistics?.freightCost || order.estimatedFreight || 0) +
-                        (order.logistics?.loadingCharges || 0) +
+                        logisticsFreightVal +
+                        logisticsLoadingVal +
                         (order.logistics?.otherCharges || 0)) -
                         ((order.advanceAmount || 0) + outstandingSummary.received)
                       ).toLocaleString("en-IN")}
@@ -772,198 +874,180 @@ function OrderDetail() {
 
         {/* TAB 2: LOGISTICS */}
         {activeTab === "logistics" && (
-          <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-semibold text-lg">Transport & Logistics Desk</h3>
-              {!isEditingLogistics && (
-                <button
-                  onClick={startLogisticsEdit}
-                  className="px-4 py-1.5 bg-primary text-on-primary text-sm font-medium rounded hover:opacity-90 transition-all flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-[16px]">edit</span>
-                  Edit Logistics Details
-                </button>
-              )}
+          <div className="space-y-6">
+            {/* Order Dispatch Progress Summary */}
+            <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm p-6">
+              <h3 className="font-semibold text-lg mb-4 text-foreground">Order Dispatch Progress</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {(order?.products || []).map((p: any) => {
+                  const dispQty = getDispatchedQtyForProduct(p.productName);
+                  const remaining = Math.max(0, p.quantity - dispQty);
+                  const progressPct = Math.min(100, Math.round((dispQty / p.quantity) * 100));
+                  return (
+                    <div key={p._id || p.productName} className="p-4 bg-wireframe-bg-alt/30 border border-wireframe-border rounded-lg">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-semibold text-sm">{p.productName}</span>
+                        <span className="text-xs text-muted-foreground">{p.unit}</span>
+                      </div>
+                      <div className="text-2xl font-bold text-primary mb-2">
+                        {dispQty} / {p.quantity} <span className="text-sm font-medium text-muted-foreground">dispatched</span>
+                      </div>
+                      <div className="w-full bg-wireframe-border h-2 rounded-full overflow-hidden mb-1">
+                        <div className="bg-green-600 h-full rounded-full transition-all duration-300" style={{ width: `${progressPct}%` }}></div>
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{progressPct}% Completed</span>
+                        <span className={remaining > 0 ? "text-yellow-600 font-medium" : "text-green-600 font-medium"}>
+                          {remaining > 0 ? `${remaining} remaining` : "Fully dispatched"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {isEditingLogistics ? (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Transporter Name</label>
-                      <input
-                        type="text"
-                        className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        value={transporterName}
-                        onChange={(e) => setTransporterName(e.target.value)}
-                        placeholder="e.g. Punjab Road Carrier"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Vehicle Number</label>
-                      <input
-                        type="text"
-                        className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        value={vehicleNumber}
-                        onChange={(e) => setVehicleNumber(e.target.value)}
-                        placeholder="e.g. PB-13-AB-9876"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Driver Name</label>
-                      <input
-                        type="text"
-                        className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        value={driverName}
-                        onChange={(e) => setDriverName(e.target.value)}
-                        placeholder="e.g. Gurnam Singh"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Driver Mobile</label>
-                      <input
-                        type="text"
-                        className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        value={driverMobile}
-                        onChange={(e) => setDriverMobile(e.target.value)}
-                        placeholder="e.g. 9417012345"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">LR Number (Lorry Receipt)</label>
-                      <input
-                        type="text"
-                        className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        value={lrNumber}
-                        onChange={(e) => setLrNumber(e.target.value)}
-                        placeholder="e.g. PRC-998877"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Dispatch Date</label>
-                      <input
-                        type="date"
-                        className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        value={dispatchDate}
-                        onChange={(e) => setDispatchDate(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Expected Delivery Date</label>
-                      <input
-                        type="date"
-                        className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        value={expectedDeliveryDate}
-                        onChange={(e) => setExpectedDeliveryDate(e.target.value)}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">Freight Cost (₹)</label>
-                        <input
-                          type="number"
-                          className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                          value={freightCost}
-                          onChange={(e) => setFreightCost(Number(e.target.value))}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">Loading Charges (₹)</label>
-                        <input
-                          type="number"
-                          className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                          value={loadingCharges}
-                          onChange={(e) => setLoadingCharges(Number(e.target.value))}
-                        />
-                      </div>
-                    </div>
-                  </div>
+            {/* Dispatches list */}
+            <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="font-semibold text-lg text-foreground">Vehicle Trips / Dispatches</h3>
+                  <p className="text-sm text-muted-foreground">Track separate vehicle trips and their respective freights</p>
                 </div>
-
-                <div className="flex justify-end gap-3 border-t border-wireframe-border pt-4">
+                {order?.status !== "DELIVERED" && (
                   <button
-                    onClick={() => setIsEditingLogistics(false)}
-                    className="px-4 py-2 border border-wireframe-border rounded-md font-medium hover:bg-wireframe-bg-alt transition-colors"
-                    type="button"
+                    onClick={() => setIsAddingDispatch(true)}
+                    className="px-4 py-2 bg-primary text-primary-foreground font-semibold rounded hover:opacity-90 transition-all flex items-center gap-1.5 shadow-sm"
                   >
-                    Cancel
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                    Add Vehicle Dispatch
                   </button>
-                  <button
-                    onClick={() => logisticsMutation.mutate({ status: "FREIGHT_APPROVAL_PENDING" })}
-                    disabled={logisticsMutation.isPending}
-                    className="bg-yellow-600 text-white hover:bg-yellow-700 px-4 py-2 rounded-md font-medium flex items-center gap-2 disabled:opacity-75"
-                    type="button"
-                  >
-                    Request Freight Approval
-                  </button>
-                  <button
-                    onClick={() => logisticsMutation.mutate({ status: "DISPATCH_READY" })}
-                    disabled={logisticsMutation.isPending}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 px-5 py-2 rounded-md font-medium flex items-center gap-2 disabled:opacity-75"
-                    type="button"
-                  >
-                    {logisticsMutation.isPending ? "Saving..." : "Save & Make Dispatch Ready"}
-                  </button>
-                </div>
+                )}
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-200">
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 pb-2 border-b border-wireframe-border/50">
-                    <span className="text-muted-foreground">Transporter</span>
-                    <span className="font-semibold text-right">{order.logistics?.transporterName || "-"}</span>
-                  </div>
-                  <div className="grid grid-cols-2 pb-2 border-b border-wireframe-border/50">
-                    <span className="text-muted-foreground">Vehicle Number</span>
-                    <span className="font-semibold text-right">{order.logistics?.vehicleNumber || "-"}</span>
-                  </div>
-                  <div className="grid grid-cols-2 pb-2 border-b border-wireframe-border/50">
-                    <span className="text-muted-foreground">Driver Details</span>
-                    <span className="font-semibold text-right">
-                      {order.logistics?.driverName || "-"} 
-                      {order.logistics?.driverMobile ? ` (${order.logistics.driverMobile})` : ""}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 pb-2 border-b border-wireframe-border/50">
-                    <span className="text-muted-foreground">LR Number</span>
-                    <span className="font-semibold text-right">{order.logistics?.lrNumber || "-"}</span>
-                  </div>
+
+              {isLoadingDispatches ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <span className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full inline-block mr-2 align-middle"></span>
+                  Loading dispatches...
                 </div>
-                <div className="space-y-4 bg-wireframe-bg-alt/30 p-4 rounded-lg border border-wireframe-border">
-                  <h4 className="font-medium mb-2 text-primary">Freight & Costs</h4>
-                  <div className="grid grid-cols-2 pb-2 border-b border-wireframe-border/50">
-                    <span className="text-muted-foreground">Freight Cost</span>
-                    <span className="font-medium text-right">₹{(order.logistics?.freightCost || 0).toLocaleString("en-IN")}</span>
-                  </div>
-                  <div className="grid grid-cols-2 pb-2 border-b border-wireframe-border/50">
-                    <span className="text-muted-foreground">Freight Status</span>
-                    <span className="text-right">
-                      {order.logistics?.isFreightApproved ? (
-                        <span className="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-green-200">Approved by MD</span>
-                      ) : order.status === "FREIGHT_APPROVAL_PENDING" ? (
-                        <span className="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-yellow-200 animate-pulse">Pending MD Approval</span>
-                      ) : (
-                        <span className="bg-gray-100 text-gray-800 text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-gray-200">Not Requested / Draft</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 pb-2 border-b border-wireframe-border/50">
-                    <span className="text-muted-foreground">Loading Charges</span>
-                    <span className="font-medium text-right">₹{(order.logistics?.loadingCharges || 0).toLocaleString("en-IN")}</span>
-                  </div>
-                  <div className="grid grid-cols-2 pt-2">
-                    <span className="font-bold">Total Logistics Cost</span>
-                    <span className="font-bold text-right text-primary">
-                      ₹{((order.logistics?.freightCost || 0) + (order.logistics?.loadingCharges || 0)).toLocaleString("en-IN")}
-                    </span>
-                  </div>
+              ) : dispatchesList.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground border-2 border-dashed border-wireframe-border rounded-lg">
+                  No vehicle dispatches recorded for this order yet.
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-wireframe-border text-xs text-muted-foreground uppercase font-bold bg-wireframe-bg-alt/30">
+                        <th className="py-3 px-4">Dispatch #</th>
+                        <th className="py-3 px-4">Vehicle Details</th>
+                        <th className="py-3 px-4">Transporter</th>
+                        <th className="py-3 px-4">Loaded Qty</th>
+                        <th className="py-3 px-4">Freight & Status</th>
+                        <th className="py-3 px-4">Trip Status</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-wireframe-border text-sm">
+                      {dispatchesList.map((disp: any) => {
+                        const totalLoaded = disp.products?.reduce((sum: number, p: any) => sum + p.quantity, 0) || 0;
+                        return (
+                          <tr key={disp._id} className="hover:bg-wireframe-bg-alt/10">
+                            <td className="py-3 px-4 font-medium text-primary">
+                              {disp.dispatchNumber}
+                              <div className="text-[10px] text-muted-foreground">{new Date(disp.dispatchDate).toLocaleDateString()}</div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="font-semibold text-foreground">{disp.vehicleNumber}</div>
+                              <div className="text-xs text-muted-foreground">{disp.driverName} ({disp.driverMobile})</div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div>{disp.transporterName || "-"}</div>
+                              <div className="text-[10px] text-muted-foreground">LR: {disp.lrNumber || "-"}</div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="font-semibold text-foreground">{totalLoaded} tons</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {disp.products?.map((p: any) => `${p.productName}: ${p.quantity}`).join(", ")}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="font-semibold text-foreground">₹{disp.freightCost?.toLocaleString("en-IN")}</div>
+                              <div className="mt-1">
+                                {disp.isFreightApproved ? (
+                                  <span className="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded font-bold border border-green-200">Approved</span>
+                                ) : disp.status === "FREIGHT_APPROVAL_PENDING" ? (
+                                  <span className="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded font-bold border border-yellow-200 animate-pulse">Pending MD</span>
+                                ) : (
+                                  <span className="bg-gray-100 text-gray-800 text-[10px] px-2 py-0.5 rounded font-bold border border-gray-200">Not Req.</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                disp.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
+                                disp.status === 'DISPATCHED' ? 'bg-blue-100 text-blue-800' :
+                                disp.status === 'IN_TRANSIT' ? 'bg-indigo-100 text-indigo-800' :
+                                disp.status === 'FREIGHT_APPROVAL_PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {disp.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right space-y-1">
+                              {/* MD Approval Buttons */}
+                              {disp.status === "FREIGHT_APPROVAL_PENDING" && (isSuperAdminOrAdmin || isMD) && (
+                                <div className="flex justify-end gap-1.5">
+                                  <button
+                                    onClick={() => updateDispatchStatusMutation.mutate({ dispatchId: disp._id, status: "APPROVED_FREIGHT" })}
+                                    className="bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 rounded font-semibold"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const remarks = prompt("Enter rejection reason:");
+                                      if (remarks !== null) {
+                                        updateDispatchStatusMutation.mutate({ dispatchId: disp._id, status: "REJECTED_FREIGHT", remarks });
+                                      }
+                                    }}
+                                    className="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded font-semibold"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Logistics transition buttons */}
+                              {disp.status !== "DELIVERED" && disp.status !== "FREIGHT_APPROVAL_PENDING" && (
+                                <div className="flex justify-end gap-1.5">
+                                  {disp.status === "PLANNED" && (
+                                    <button
+                                      onClick={() => updateDispatchStatusMutation.mutate({ dispatchId: disp._id, status: "DISPATCHED" })}
+                                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded font-semibold"
+                                    >
+                                      Dispatch
+                                    </button>
+                                  )}
+                                  {(disp.status === "DISPATCHED" || disp.status === "IN_TRANSIT") && (
+                                    <button
+                                      onClick={() => updateDispatchStatusMutation.mutate({ dispatchId: disp._id, status: "DELIVERED" })}
+                                      className="bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 rounded font-semibold"
+                                    >
+                                      Deliver
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1572,6 +1656,181 @@ function OrderDetail() {
               >
                 {statusMutation.isPending ? "Submitting..." : "Confirm & Update"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Add Dispatch Modal Dialog */}
+      {isAddingDispatch && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg border border-wireframe-border shadow-xl max-w-lg w-full p-6 animate-in zoom-in-95 duration-150 my-8">
+            <h3 className="font-semibold text-lg mb-4 text-foreground">Add Vehicle Dispatch / Trip</h3>
+            <div className="space-y-4">
+              {/* Vehicle Number & Transporter */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Vehicle Number *</label>
+                  <input
+                    type="text"
+                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={newDispatchVehicleNumber}
+                    onChange={(e) => setNewDispatchVehicleNumber(e.target.value)}
+                    placeholder="e.g. PB-10-XY-9999"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Transporter Name</label>
+                  <input
+                    type="text"
+                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={newDispatchTransporterName}
+                    onChange={(e) => setNewDispatchTransporterName(e.target.value)}
+                    placeholder="e.g. Blue Dart Logistics"
+                  />
+                </div>
+              </div>
+
+              {/* Driver Details */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Driver Name *</label>
+                  <input
+                    type="text"
+                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={newDispatchDriverName}
+                    onChange={(e) => setNewDispatchDriverName(e.target.value)}
+                    placeholder="e.g. Ramesh Kumar"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Driver Mobile *</label>
+                  <input
+                    type="text"
+                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={newDispatchDriverMobile}
+                    onChange={(e) => setNewDispatchDriverMobile(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                  />
+                </div>
+              </div>
+
+              {/* Lorry Receipt (LR) & Cost */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5 col-span-1">
+                  <label className="text-sm font-medium">LR Number</label>
+                  <input
+                    type="text"
+                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={newDispatchLrNumber}
+                    onChange={(e) => setNewDispatchLrNumber(e.target.value)}
+                    placeholder="e.g. LR-776"
+                  />
+                </div>
+                <div className="space-y-1.5 col-span-1">
+                  <label className="text-sm font-medium">Freight Cost (₹) *</label>
+                  <input
+                    type="number"
+                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={newDispatchFreightCost || ""}
+                    onChange={(e) => setNewDispatchFreightCost(Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-1.5 col-span-1">
+                  <label className="text-sm font-medium">Loading (₹)</label>
+                  <input
+                    type="number"
+                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={newDispatchLoadingCharges || ""}
+                    onChange={(e) => setNewDispatchLoadingCharges(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              {/* Products Quantities Loaded */}
+              <div className="border border-wireframe-border rounded-md p-3.5 bg-wireframe-bg-alt/10">
+                <label className="block text-sm font-bold text-primary mb-2 uppercase tracking-wider">Quantities loaded in this vehicle</label>
+                <div className="space-y-2">
+                  {newDispatchProducts.map((p: any, idx: number) => (
+                    <div key={p.productName} className="flex items-center justify-between gap-4">
+                      <span className="text-sm font-medium">{p.productName}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Ordered: {p.totalOrdered}, Dispatched: {p.alreadyDispatched}</span>
+                        <input
+                          type="number"
+                          className="w-24 border border-input bg-background rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-bold text-center"
+                          value={p.quantity || ""}
+                          onChange={(e) => {
+                            const newProds = [...newDispatchProducts];
+                            newProds[idx] = { ...newProds[idx], quantity: Number(e.target.value) };
+                            setNewDispatchProducts(newProds);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Remarks / Trip Notes</label>
+                <textarea
+                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm min-h-[60px]"
+                  value={newDispatchRemarks}
+                  onChange={(e) => setNewDispatchRemarks(e.target.value)}
+                  placeholder="Any logistics or route notes..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-4 border-t border-wireframe-border">
+                <button
+                  onClick={() => setIsAddingDispatch(false)}
+                  className="px-4 py-2 border border-wireframe-border rounded-md text-sm font-medium hover:bg-wireframe-bg-alt"
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => createDispatchMutation.mutate({
+                    orderId,
+                    vehicleNumber: newDispatchVehicleNumber,
+                    transporterName: newDispatchTransporterName,
+                    driverName: newDispatchDriverName,
+                    driverMobile: newDispatchDriverMobile,
+                    lrNumber: newDispatchLrNumber,
+                    freightCost: newDispatchFreightCost,
+                    loadingCharges: newDispatchLoadingCharges,
+                    remarks: newDispatchRemarks,
+                    products: newDispatchProducts.map(p => ({ productName: p.productName, quantity: p.quantity })),
+                    status: "FREIGHT_APPROVAL_PENDING"
+                  })}
+                  disabled={createDispatchMutation.isPending || !newDispatchVehicleNumber || !newDispatchDriverName || !newDispatchDriverMobile}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                  type="button"
+                >
+                  Request Freight Approval
+                </button>
+                <button
+                  onClick={() => createDispatchMutation.mutate({
+                    orderId,
+                    vehicleNumber: newDispatchVehicleNumber,
+                    transporterName: newDispatchTransporterName,
+                    driverName: newDispatchDriverName,
+                    driverMobile: newDispatchDriverMobile,
+                    lrNumber: newDispatchLrNumber,
+                    freightCost: newDispatchFreightCost,
+                    loadingCharges: newDispatchLoadingCharges,
+                    remarks: newDispatchRemarks,
+                    products: newDispatchProducts.map(p => ({ productName: p.productName, quantity: p.quantity })),
+                    status: "PLANNED"
+                  })}
+                  disabled={createDispatchMutation.isPending || !newDispatchVehicleNumber || !newDispatchDriverName || !newDispatchDriverMobile}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                  type="button"
+                >
+                  Create planned Trip
+                </button>
+              </div>
             </div>
           </div>
         </div>
