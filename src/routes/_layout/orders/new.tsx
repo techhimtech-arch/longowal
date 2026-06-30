@@ -83,6 +83,9 @@ function CreateOrder() {
     }
   });
 
+  const userRoleNormalized = (user?.role || '').toLowerCase().replace(/[\s_-]/g, '');
+  const canManageUsers = ["superadmin", "super_admin", "admin", "md", "managingdirector"].includes(userRoleNormalized);
+
   // Fetch users for assignment dropdown
   const { data: users = [] } = useQuery({
     queryKey: ["users"],
@@ -93,7 +96,8 @@ function CreateOrder() {
       } catch (e) {
         return [];
       }
-    }
+    },
+    enabled: canManageUsers
   });
 
   const handleProductChange = (index: number, field: keyof ProductRow, value: string | number) => {
@@ -304,26 +308,27 @@ function CreateOrder() {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Sales Executive</label>
-              <select 
-                className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                value={salesExecutiveId}
-                onChange={(e) => setSalesExecutiveId(e.target.value)}
-              >
-                <option value="">Select Executive</option>
-                {users.length > 0 ? (
-                  users.map((u: any) => (
+              {canManageUsers ? (
+                <select 
+                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={salesExecutiveId}
+                  onChange={(e) => setSalesExecutiveId(e.target.value)}
+                >
+                  <option value="">Select Executive</option>
+                  {users.map((u: any) => (
                     <option key={u._id} value={u._id}>
                       {u.firstName} {u.lastName}
                     </option>
-                  ))
-                ) : (
-                  user && (
-                    <option value={user.id}>
-                      {user.name}
-                    </option>
-                  )
-                )}
-              </select>
+                  ))}
+                </select>
+              ) : (
+                <input 
+                  type="text"
+                  readOnly
+                  className="w-full border border-input bg-wireframe-bg-alt/50 rounded-md px-3 py-2 text-sm text-muted-foreground focus:outline-none cursor-not-allowed"
+                  value={user?.name || ""}
+                />
+              )}
             </div>
           </div>
         </div>
