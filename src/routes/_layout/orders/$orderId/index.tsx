@@ -128,6 +128,32 @@ function OrderDetail() {
     }
   });
 
+  // Fetch Master Plants
+  const { data: masterPlants = [] } = useQuery({
+    queryKey: ["masterPlants"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("/masters?category=PLANT&isActive=all");
+        return res.data?.data || [];
+      } catch (e) {
+        return [];
+      }
+    }
+  });
+
+  // Fetch Master Products
+  const { data: masterProducts = [] } = useQuery({
+    queryKey: ["masterProducts"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("/masters?category=PRODUCT&isActive=all");
+        return res.data?.data || [];
+      } catch (e) {
+        return [];
+      }
+    }
+  });
+
   // Edit Order Modal States
   const [editCustomer, setEditCustomer] = useState("");
   const [editFirm, setEditFirm] = useState("");
@@ -788,7 +814,12 @@ function OrderDetail() {
                     <tbody>
                       {order.products?.map((item: any, idx: number) => (
                         <tr key={item._id || idx} className="border-b border-wireframe-border">
-                          <td className="px-4 py-3 font-medium">{item.productName}</td>
+                          <td className="px-4 py-3 font-medium">
+                            {(() => {
+                              const match = masterProducts.find((mp: any) => mp.key === item.productName);
+                              return match ? `${item.productName} - ${match.value?.name || item.productName}` : item.productName;
+                            })()}
+                          </td>
                           <td className="px-4 py-3">{item.quantity} {item.unit || "tons"}</td>
                           <td className="px-4 py-3">₹{(item.supplyRate || 0).toLocaleString("en-IN")}</td>
                           <td className="px-4 py-3">₹{(item.freight || 0).toLocaleString("en-IN")}</td>
@@ -838,7 +869,11 @@ function OrderDetail() {
                 <div>
                   <span className="text-xs text-muted-foreground">Dispatch Plant</span>
                   <p className="font-semibold mt-1">
-                    {order.plantName || "-"} {order.dispatchLocation ? `(${order.dispatchLocation})` : ""}
+                    {(() => {
+                      if (!order.plantName) return "-";
+                      const matchedPlant = masterPlants.find((p: any) => p.key === order.plantName);
+                      return matchedPlant ? `${order.plantName} - ${matchedPlant.value?.name || order.plantName}` : order.plantName;
+                    })()} {order.dispatchLocation ? `(${order.dispatchLocation})` : ""}
                   </p>
                 </div>
               </div>
@@ -1540,13 +1575,18 @@ function OrderDetail() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold">Plant Name</label>
-                        <input
-                          type="text"
+                        <select
                           className="w-full border border-input bg-background rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                           value={editPlantName}
                           onChange={(e) => setEditPlantName(e.target.value)}
-                          placeholder="e.g. Plant A"
-                        />
+                        >
+                          <option value="">Select Loading Plant</option>
+                          {masterPlants.map((p: any) => (
+                            <option key={p._id} value={p.key}>
+                              {p.value?.name || p.key}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold">Dispatch Location</label>
@@ -1615,16 +1655,37 @@ function OrderDetail() {
                       {editProducts.map((p, index) => (
                         <tr key={p.id} className="border-b border-wireframe-border last:border-0 bg-white">
                           <td className="px-3 py-2">
-                            <input
-                              type="text"
+                            <select
                               className="w-full border border-input bg-background rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
                               value={p.productName}
                               onChange={(e) => {
-                                const newP = [...editProducts];
-                                newP[index].productName = e.target.value;
-                                setEditProducts(newP);
+                                const prodName = e.target.value;
+                                const match = masterProducts.find((mp: any) => mp.key === prodName);
+                                if (match) {
+                                  const newP = [...editProducts];
+                                  newP[index] = {
+                                    ...newP[index],
+                                    productName: prodName,
+                                    unit: match.value?.defaultUnit || "tons",
+                                    gstPercent: match.value?.defaultGstPercent || 0
+                                  };
+                                  setEditProducts(newP);
+                                  handleEditProductChange(index, "productName", prodName);
+                                } else {
+                                  const newP = [...editProducts];
+                                  newP[index].productName = prodName;
+                                  setEditProducts(newP);
+                                  handleEditProductChange(index, "productName", prodName);
+                                }
                               }}
-                            />
+                            >
+                              <option value="">Select Product</option>
+                              {masterProducts.map((mp: any) => (
+                                <option key={mp._id} value={mp.key}>
+                                  {mp.value?.name || mp.key}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           <td className="px-3 py-2">
                             <input
