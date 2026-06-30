@@ -1112,7 +1112,6 @@ function OrderDetail() {
                             </td>
                             <td className="py-3 px-4">
                               <div>{disp.transporterName || "-"}</div>
-                              <div className="text-[10px] text-muted-foreground">LR: {disp.lrNumber || "-"}</div>
                             </td>
                             <td className="py-3 px-4">
                               <div className="font-semibold text-foreground">{totalLoaded} tons</div>
@@ -1258,8 +1257,8 @@ function OrderDetail() {
                 </p>
               </div>
               <div className="p-4 bg-wireframe-bg-alt/30 rounded border border-wireframe-border">
-                <p className="text-sm text-muted-foreground mb-1">Lorry Receipt Reference</p>
-                <p className="font-bold">{order.logistics?.lrNumber || "N/A"}</p>
+                <p className="text-sm text-muted-foreground mb-1">Transporter Name</p>
+                <p className="font-bold">{order.logistics?.transporterName || "N/A"}</p>
               </div>
             </div>
           </div>
@@ -1961,18 +1960,8 @@ function OrderDetail() {
                 </div>
               </div>
 
-              {/* Lorry Receipt (LR) & Cost */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1.5 col-span-1">
-                  <label className="text-sm font-medium">LR Number</label>
-                  <input
-                    type="text"
-                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    value={newDispatchLrNumber}
-                    onChange={(e) => setNewDispatchLrNumber(e.target.value)}
-                    placeholder="e.g. LR-776"
-                  />
-                </div>
+              {/* Cost & Loading */}
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5 col-span-1">
                   <label className="text-sm font-medium">Freight Cost (₹) *</label>
                   <input
