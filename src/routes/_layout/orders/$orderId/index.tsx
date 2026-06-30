@@ -281,7 +281,7 @@ function OrderDetail() {
 
   // Mutation for updating logistics details
   const logisticsMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ status }: { status: string }) => {
       const payload = {
         logistics: {
           transporterName,
@@ -294,17 +294,22 @@ function OrderDetail() {
           dispatchDate: dispatchDate ? new Date(dispatchDate).toISOString() : undefined,
           expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate).toISOString() : undefined,
         },
-        status: "DISPATCH_READY",
+        status,
       };
       const res = await api.put(`/orders/${orderId}/logistics`, payload);
       return res.data;
     },
-    onSuccess: () => {
-      toast.success("Logistics transport details updated successfully!");
+    onSuccess: (_, variables) => {
+      toast.success(
+        variables.status === "FREIGHT_APPROVAL_PENDING"
+          ? "Freight approval request successfully sent to MD!"
+          : "Logistics transport details updated successfully!"
+      );
       setIsEditingLogistics(false);
       queryClient.invalidateQueries({ queryKey: ["order", orderId] });
     },
     onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || "Failed to update logistics details");
       console.error(err);
     }
   });
@@ -470,6 +475,23 @@ function OrderDetail() {
                 className="bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded-md font-medium"
               >
                 Reject
+              </button>
+            </>
+          )}
+
+          {order.status === "FREIGHT_APPROVAL_PENDING" && (isSuperAdminOrAdmin || isMD) && (
+            <>
+              <button
+                onClick={() => triggerStatusChange("APPROVED_FREIGHT")}
+                className="bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-md font-medium"
+              >
+                Approve Freight
+              </button>
+              <button
+                onClick={() => triggerStatusChange("REJECTED_FREIGHT")}
+                className="bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded-md font-medium"
+              >
+                Reject Freight
               </button>
             </>
           )}
@@ -866,13 +888,23 @@ function OrderDetail() {
                   <button
                     onClick={() => setIsEditingLogistics(false)}
                     className="px-4 py-2 border border-wireframe-border rounded-md font-medium hover:bg-wireframe-bg-alt transition-colors"
+                    type="button"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={() => logisticsMutation.mutate()}
+                    onClick={() => logisticsMutation.mutate({ status: "FREIGHT_APPROVAL_PENDING" })}
+                    disabled={logisticsMutation.isPending}
+                    className="bg-yellow-600 text-white hover:bg-yellow-700 px-4 py-2 rounded-md font-medium flex items-center gap-2 disabled:opacity-75"
+                    type="button"
+                  >
+                    Request Freight Approval
+                  </button>
+                  <button
+                    onClick={() => logisticsMutation.mutate({ status: "DISPATCH_READY" })}
                     disabled={logisticsMutation.isPending}
                     className="bg-primary text-primary-foreground hover:bg-primary/90 px-5 py-2 rounded-md font-medium flex items-center gap-2 disabled:opacity-75"
+                    type="button"
                   >
                     {logisticsMutation.isPending ? "Saving..." : "Save & Make Dispatch Ready"}
                   </button>
@@ -906,6 +938,18 @@ function OrderDetail() {
                   <div className="grid grid-cols-2 pb-2 border-b border-wireframe-border/50">
                     <span className="text-muted-foreground">Freight Cost</span>
                     <span className="font-medium text-right">₹{(order.logistics?.freightCost || 0).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="grid grid-cols-2 pb-2 border-b border-wireframe-border/50">
+                    <span className="text-muted-foreground">Freight Status</span>
+                    <span className="text-right">
+                      {order.logistics?.isFreightApproved ? (
+                        <span className="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-green-200">Approved by MD</span>
+                      ) : order.status === "FREIGHT_APPROVAL_PENDING" ? (
+                        <span className="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-yellow-200 animate-pulse">Pending MD Approval</span>
+                      ) : (
+                        <span className="bg-gray-100 text-gray-800 text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-gray-200">Not Requested / Draft</span>
+                      )}
+                    </span>
                   </div>
                   <div className="grid grid-cols-2 pb-2 border-b border-wireframe-border/50">
                     <span className="text-muted-foreground">Loading Charges</span>
