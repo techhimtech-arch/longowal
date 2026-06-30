@@ -60,6 +60,43 @@ function OrderDetail() {
   const [newDispatchRemarks, setNewDispatchRemarks] = useState("");
   const [newDispatchProducts, setNewDispatchProducts] = useState<any[]>([]);
 
+  // Rejection Material Adjustment State
+  const [adjustmentType, setAdjustmentType] = useState("RETURNED_TO_STOCK");
+  const [adjustedToOrderId, setAdjustedToOrderId] = useState("");
+  const [adjustmentRemarks, setAdjustmentRemarks] = useState("");
+
+  // Transporter Payments State
+  const [isRecordingTransporterPayment, setIsRecordingTransporterPayment] = useState(false);
+  const [selectedDispatchId, setSelectedDispatchId] = useState("");
+  const [paymentRemarksText, setPaymentRemarksText] = useState("");
+  const [paymentProofUrl, setPaymentProofUrl] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const res = await api.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      });
+      if (res.data?.url) {
+        setPaymentProofUrl(res.data.url);
+        toast.success("Payment proof uploaded successfully!");
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "File upload failed");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // Fetch single order details
   const { data: orderResponse, isLoading: isLoadingOrder, error: orderError } = useQuery({
     queryKey: ["order", orderId],
@@ -416,10 +453,33 @@ function OrderDetail() {
     }
   });
 
+  // Mutation for recording transporter payment
+  const recordTransporterPaymentMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        transporterPaymentRemarks: paymentRemarksText,
+        transporterPaymentProofUrl: paymentProofUrl
+      };
+      const res = await api.put(`/dispatches/${selectedDispatchId}/payment`, payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Transporter payment recorded successfully!");
+      setIsRecordingTransporterPayment(false);
+      setPaymentRemarksText("");
+      setPaymentProofUrl("");
+      queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+      queryClient.invalidateQueries({ queryKey: ["dispatches", orderId] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || "Failed to record payment");
+    }
+  });
+
   // Mutation for updating order status
   const statusMutation = useMutation({
-    mutationFn: async ({ status, remarks }: { status: string; remarks?: string }) => {
-      const res = await api.put(`/orders/${orderId}/status`, { status, remarks });
+    mutationFn: async (payload: { status: string; remarks?: string; materialAdjustment?: any }) => {
+      const res = await api.put(`/orders/${orderId}/status`, payload);
       return res.data;
     },
     onSuccess: (_, variables) => {
@@ -490,7 +550,15 @@ function OrderDetail() {
   };
 
   const submitStatusChange = () => {
-    statusMutation.mutate({ status: targetStatus, remarks: statusRemarks });
+    const payload: any = { status: targetStatus, remarks: statusRemarks };
+    if (targetStatus === "REJECTED") {
+      payload.materialAdjustment = {
+        adjustmentType,
+        adjustedToOrderId: adjustmentType === "DIVERTED_TO_OTHER_ORDER" ? adjustedToOrderId : undefined,
+        adjustmentRemarks
+      };
+    }
+    statusMutation.mutate(payload);
   };
 
   if (isLoadingOrder) {
@@ -643,6 +711,42 @@ function OrderDetail() {
           </button>
         ))}
       </div>
+
+      {order.status === "REJECTED" && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+          <div className="flex items-start gap-2.5">
+            <span className="material-symbols-outlined text-[20px] text-red-600 mt-0.5">warning</span>
+            <div>
+              <h4 className="font-bold text-sm">Order Booking Rejected</h4>
+              <p className="text-xs text-red-700 mt-1">
+                Remarks: {order.remarks || "No reason specified."}
+              </p>
+              {order.materialAdjustment && (
+                <div className="mt-2 text-xs bg-white/60 p-2.5 rounded border border-red-100 space-y-1">
+                  <span className="font-bold text-[10px] uppercase text-red-600 block mb-1">Material Adjustment Plan</span>
+                  <div>
+                    <span className="font-semibold">Type: </span>
+                    {order.materialAdjustment.adjustmentType === "DIVERTED_TO_OTHER_ORDER" ? "Diverted to other Order" :
+                     order.materialAdjustment.adjustmentType === "RETURNED_TO_STOCK" ? "Returned to Stock" : "Other"}
+                  </div>
+                  {order.materialAdjustment.adjustedToOrderId && (
+                    <div>
+                      <span className="font-semibold">Diverted to Order ID: </span>
+                      <span className="font-mono bg-red-100/50 px-1 rounded">{order.materialAdjustment.adjustedToOrderId}</span>
+                    </div>
+                  )}
+                  {order.materialAdjustment.adjustmentRemarks && (
+                    <div>
+                      <span className="font-semibold">Adjustment Notes: </span>
+                      {order.materialAdjustment.adjustmentRemarks}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab Content */}
       <div className="space-y-6">
@@ -973,13 +1077,46 @@ function OrderDetail() {
                             </td>
                             <td className="py-3 px-4">
                               <div className="font-semibold text-foreground">₹{disp.freightCost?.toLocaleString("en-IN")}</div>
-                              <div className="mt-1">
+                              <div className="mt-1 flex flex-wrap gap-1">
                                 {disp.isFreightApproved ? (
                                   <span className="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded font-bold border border-green-200">Approved</span>
                                 ) : disp.status === "FREIGHT_APPROVAL_PENDING" ? (
                                   <span className="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded font-bold border border-yellow-200 animate-pulse">Pending MD</span>
                                 ) : (
                                   <span className="bg-gray-100 text-gray-800 text-[10px] px-2 py-0.5 rounded font-bold border border-gray-200">Not Req.</span>
+                                )}
+                              </div>
+                              <div className="mt-1.5 text-[10px] space-y-1">
+                                <div className="text-muted-foreground font-semibold">Payment Status:</div>
+                                {disp.transporterPaymentStatus === "PAID" ? (
+                                  <div className="space-y-0.5">
+                                    <span className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded font-bold uppercase border border-green-200">Paid</span>
+                                    {disp.transporterPaymentProofUrl && (
+                                      <a
+                                        href={disp.transporterPaymentProofUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="block text-primary hover:underline font-semibold"
+                                      >
+                                        View Proof
+                                      </a>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold uppercase border border-red-200">Unpaid</span>
+                                    {disp.status === "DELIVERED" && (isSuperAdminOrAdmin || isAccounts) && (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedDispatchId(disp._id);
+                                          setIsRecordingTransporterPayment(true);
+                                        }}
+                                        className="block mt-1 text-[10px] text-primary font-bold hover:underline"
+                                      >
+                                        Record Payment
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </td>
@@ -1633,8 +1770,47 @@ function OrderDetail() {
               You are changing the order status to <span className="font-bold text-primary">{targetStatus}</span>.
               Please add any remarks or approval notes.
             </p>
+            {targetStatus === "REJECTED" && (
+              <div className="space-y-3 mb-4 p-3 bg-red-50/50 border border-red-100 rounded-md">
+                <h4 className="font-bold text-xs uppercase text-red-700 tracking-wider">Material Adjustment Plan</h4>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Adjustment Type *</label>
+                  <select
+                    className="w-full border border-input bg-background rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-medium"
+                    value={adjustmentType}
+                    onChange={(e) => setAdjustmentType(e.target.value)}
+                  >
+                    <option value="RETURNED_TO_STOCK">Returned to Stock</option>
+                    <option value="DIVERTED_TO_OTHER_ORDER">Diverted to other Order</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+                {adjustmentType === "DIVERTED_TO_OTHER_ORDER" && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">Divert to Order ID (Reference) *</label>
+                    <input
+                      type="text"
+                      className="w-full border border-input bg-background rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      value={adjustedToOrderId}
+                      onChange={(e) => setAdjustedToOrderId(e.target.value)}
+                      placeholder="e.g. 6a420ff3..."
+                    />
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Adjustment Notes / Instructions</label>
+                  <input
+                    type="text"
+                    className="w-full border border-input bg-background rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={adjustmentRemarks}
+                    onChange={(e) => setAdjustmentRemarks(e.target.value)}
+                    placeholder="e.g. Diverted loaded truck to customer Y order"
+                  />
+                </div>
+              </div>
+            )}
             <div className="space-y-1.5 mb-6">
-              <label className="text-sm font-medium">Remarks / Reason *</label>
+              <label className="text-sm font-medium text-foreground">Remarks / Reason *</label>
               <textarea
                 className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-primary"
                 value={statusRemarks}
@@ -1831,6 +2007,70 @@ function OrderDetail() {
                   Create planned Trip
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Record Transporter Payment Modal */}
+      {isRecordingTransporterPayment && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg border border-wireframe-border shadow-xl max-w-md w-full p-6 animate-in zoom-in-95 duration-150">
+            <h3 className="font-semibold text-lg mb-2 text-foreground">Record Transporter Payment</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Enter payment remarks and upload transport receipts / transaction proofs for this dispatch.
+            </p>
+            
+            <div className="space-y-4 mb-6">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Payment Remarks</label>
+                <input
+                  type="text"
+                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={paymentRemarksText}
+                  onChange={(e) => setPaymentRemarksText(e.target.value)}
+                  placeholder="e.g. Paid via HDFC bank transfer ref 8876"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Upload Payment Proof (JPG, PNG, PDF) *</label>
+                <input
+                  type="file"
+                  className="w-full text-xs text-muted-foreground border border-input rounded-md p-2"
+                  onChange={handleProofUpload}
+                  accept=".jpg,.jpeg,.png,.pdf"
+                />
+                {isUploading && (
+                  <div className="text-xs text-primary font-medium animate-pulse">Uploading file to server...</div>
+                )}
+                {paymentProofUrl && (
+                  <div className="text-xs text-green-700 font-medium">
+                    ✓ Proof Uploaded: <a href={paymentProofUrl} target="_blank" rel="noreferrer" className="underline font-bold">View uploaded file</a>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-wireframe-border pt-4">
+              <button
+                onClick={() => {
+                  setIsRecordingTransporterPayment(false);
+                  setPaymentRemarksText("");
+                  setPaymentProofUrl("");
+                }}
+                className="px-4 py-2 border border-wireframe-border rounded-md text-sm font-medium hover:bg-wireframe-bg-alt"
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => recordTransporterPaymentMutation.mutate()}
+                disabled={recordTransporterPaymentMutation.isPending || isUploading || !paymentProofUrl}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                type="button"
+              >
+                {recordTransporterPaymentMutation.isPending ? "Saving..." : "Confirm & Save"}
+              </button>
             </div>
           </div>
         </div>
