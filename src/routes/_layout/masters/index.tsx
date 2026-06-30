@@ -41,7 +41,7 @@ function MastersDashboard() {
   const { data: response, isLoading, error } = useQuery({
     queryKey: ["masters", activeCategory],
     queryFn: async () => {
-      const res = await api.get(`/masters?category=${activeCategory}&isActive=false`);
+      const res = await api.get(`/masters?category=${activeCategory}&isActive=all`);
       return res.data;
     }
   });
