@@ -28,6 +28,22 @@ function CreateOrder() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
+  const userRoleNormalized = (user?.role || '').toLowerCase().replace(/[\s_-]/g, '');
+  const isSalesExecutive = userRoleNormalized === "salesexecutive" || userRoleNormalized === "sales" || userRoleNormalized === "orgadmin";
+  const isLogistics = userRoleNormalized === "logistics" || userRoleNormalized === "logisticsteam";
+  const isAccounts = userRoleNormalized === "accounts" || userRoleNormalized === "citizen" || userRoleNormalized === "accountant";
+
+  if (isLogistics || isAccounts) {
+    return (
+      <div className="p-12 text-center text-red-600 font-bold max-w-md mx-auto mt-20 border border-red-200 bg-red-50 rounded-lg shadow-sm">
+        <span className="material-symbols-outlined text-[48px] text-red-500 mb-2">block</span>
+        <h2 className="text-xl mb-1">Access Denied</h2>
+        <p className="text-sm font-medium text-red-700">Logistics and Accounts users are not authorized to create orders.</p>
+        <Link to="/orders" className="inline-block mt-4 text-sm text-primary hover:underline font-bold">Back to Orders</Link>
+      </div>
+    );
+  }
+
   // Form states
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split("T")[0]);
   const [customerId, setCustomerId] = useState("");
@@ -83,15 +99,14 @@ function CreateOrder() {
     }
   });
 
-  const userRoleNormalized = (user?.role || '').toLowerCase().replace(/[\s_-]/g, '');
   const canManageUsers = ["superadmin", "super_admin", "admin", "md", "managingdirector"].includes(userRoleNormalized);
 
-  // Fetch users for assignment dropdown
+  // Fetch users for assignment dropdown - only fetch Sales Executives (ORG_ADMIN)
   const { data: users = [] } = useQuery({
-    queryKey: ["users"],
+    queryKey: ["users", "sales_executives"],
     queryFn: async () => {
       try {
-        const res = await api.get("/users");
+        const res = await api.get("/users", { params: { role: "ORG_ADMIN" } });
         return res.data?.data || [];
       } catch (e) {
         return [];
@@ -536,15 +551,17 @@ function CreateOrder() {
                   ))}
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Required Delivery Date</label>
-                <input 
-                  type="date" 
-                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  value={requiredDeliveryDate}
-                  onChange={(e) => setRequiredDeliveryDate(e.target.value)}
-                />
-              </div>
+              {!isSalesExecutive && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Required Delivery Date</label>
+                  <input 
+                    type="date" 
+                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={requiredDeliveryDate}
+                    onChange={(e) => setRequiredDeliveryDate(e.target.value)}
+                  />
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Estimated Freight (₹)</label>
                 <input 
@@ -565,21 +582,10 @@ function CreateOrder() {
             Section 4: Financial & Additional Details
           </div>
           <div className="p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-wireframe-bg-alt/50 p-4 rounded-md border border-wireframe-border flex flex-col justify-center">
                 <p className="text-sm text-muted-foreground mb-1">Total Order Value</p>
                 <p className="text-2xl font-bold">₹{totalOrderValue.toLocaleString("en-IN")}</p>
-              </div>
-              
-              <div className="space-y-1.5 p-4 border border-input rounded-md">
-                <label className="text-sm font-medium text-primary">Advance Amount (₹)</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  className="w-full border border-primary/30 bg-background rounded px-3 py-1.5 text-lg font-bold"
-                  value={advanceAmount || ""}
-                  onChange={(e) => setAdvanceAmount(Number(e.target.value))}
-                />
               </div>
 
               <div className="space-y-1.5 p-4 border border-primary/30 rounded-md bg-primary-container/10">

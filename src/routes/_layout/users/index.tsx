@@ -13,6 +13,7 @@ function mapUserTypeToRole(userType: string): string {
   if (userType === "ORG_ADMIN") return "Sales Executive";
   if (userType === "VOLUNTEER") return "Operations";
   if (userType === "CITIZEN") return "Accounts";
+  if (userType === "LOGISTICS_TEAM") return "Logistics";
   return "Sales Executive";
 }
 
@@ -37,6 +38,7 @@ function UsersList() {
         else if (selectedRole === "Sales Executive") params.role = "ORG_ADMIN";
         else if (selectedRole === "Operations") params.role = "VOLUNTEER";
         else if (selectedRole === "Accounts") params.role = "CITIZEN";
+        else if (selectedRole === "Logistics") params.role = "LOGISTICS_TEAM";
       }
       if (search) {
         params.search = search;
@@ -108,6 +110,7 @@ function UsersList() {
             <option value="Sales Executive">Sales Executive</option>
             <option value="Operations">Operations</option>
             <option value="Accounts">Accounts</option>
+            <option value="Logistics">Logistics</option>
           </select>
           <select
             value={selectedStatus}

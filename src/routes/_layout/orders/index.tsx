@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
 import api from "@/lib/api";
 
 export const Route = createFileRoute("/_layout/orders/")({
@@ -11,6 +12,12 @@ function OrdersList() {
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const userRoleNormalized = (user?.role || '').toLowerCase().replace(/[\s_-]/g, '');
+  const isLogistics = userRoleNormalized === "logistics" || userRoleNormalized === "logisticsteam";
+  const isAccounts = userRoleNormalized === "accounts" || userRoleNormalized === "citizen" || userRoleNormalized === "accountant";
+  const canCreateOrder = !isLogistics && !isAccounts;
 
   const { data: response, isLoading, error } = useQuery({
     queryKey: ["orders", selectedStatus],
@@ -40,13 +47,15 @@ function OrdersList() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Orders</h1>
           <p className="text-muted-foreground">Manage sales orders and track their fulfillment.</p>
         </div>
-        <Link
-          to="/orders/new"
-          className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium flex items-center gap-2 shadow-sm"
-        >
-          <span className="material-symbols-outlined text-[20px]">add</span>
-          Create New Order
-        </Link>
+        {canCreateOrder && (
+          <Link
+            to="/orders/new"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium flex items-center gap-2 shadow-sm"
+          >
+            <span className="material-symbols-outlined text-[20px]">add</span>
+            Create New Order
+          </Link>
+        )}
       </div>
 
       <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm">

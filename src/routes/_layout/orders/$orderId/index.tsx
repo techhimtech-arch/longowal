@@ -20,6 +20,7 @@ function OrderDetail() {
   const canEditOrder = isSuperAdminOrAdmin || isMD;
   const isOperations = normalizedRole === "operations" || normalizedRole === "volunteer";
   const isAccounts = normalizedRole === "accounts" || normalizedRole === "citizen" || normalizedRole === "accountant";
+  const isLogistics = normalizedRole === "logistics" || normalizedRole === "logisticsteam";
   const [activeTab, setActiveTab] = useState("overview");
 
   // Edit Logistics form state
@@ -107,6 +108,26 @@ function OrderDetail() {
   });
 
   const order = orderResponse?.data;
+
+  const isUnread = useMemo(() => {
+    if (!order || !user) return false;
+    const currentUserId = user.id || user._id || "";
+    return order.viewedBy && !order.viewedBy.some((id: any) => id.toString() === currentUserId.toString());
+  }, [order, user]);
+
+  // Fetch Logistics Users for assignment dropdown
+  const { data: logisticsUsers = [] } = useQuery({
+    queryKey: ["logisticsUsers"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("/users", { params: { role: "LOGISTICS_TEAM" } });
+        return res.data?.data || [];
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: isSuperAdminOrAdmin || isMD
+  });
 
   const [isEditingOrder, setIsEditingOrder] = useState(false);
 
@@ -634,6 +655,11 @@ function OrderDetail() {
           </div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">{order.orderNumber}</h1>
+            {isUnread && (
+              <span className="bg-red-500 text-white text-[11px] px-2 py-0.5 rounded-full font-bold uppercase animate-pulse shadow-sm animate-bounce">
+                New/Unread
+              </span>
+            )}
             <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
               order.status === 'DELIVERED' ? 'bg-green-100 text-green-800 border-green-200' :
               order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800 border-blue-200' :
@@ -726,6 +752,15 @@ function OrderDetail() {
               className="bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-md font-medium"
             >
               Mark Delivered
+            </button>
+          )}
+
+          {order.status === "DELIVERED" && (isSuperAdminOrAdmin || isLogistics) && (
+            <button
+              onClick={() => statusMutation.mutate({ status: "SENT_TO_ACCOUNTS", remarks: "Delivered and sent to accounts for payment processing." })}
+              className="bg-primary text-primary-foreground hover:opacity-90 px-4 py-2 rounded-md font-medium shadow-sm"
+            >
+              Send to Accounts
             </button>
           )}
         </div>
@@ -899,6 +934,38 @@ function OrderDetail() {
                       ? `${order.salesExecutiveId.firstName} ${order.salesExecutiveId.lastName}`
                       : "-"}
                   </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-semibold">Assigned Logistics Person</p>
+                  {isSuperAdminOrAdmin || isMD ? (
+                    <select
+                      value={order.assignedLogisticsId?._id || order.assignedLogisticsId || ""}
+                      onChange={async (e) => {
+                        const logisticsId = e.target.value || null;
+                        try {
+                          await api.put(`/orders/${orderId}`, { assignedLogisticsId: logisticsId });
+                          toast.success("Logistics member assigned successfully!");
+                          queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+                        } catch (err: any) {
+                          toast.error(err.response?.data?.message || err.message || "Failed to assign logistics member");
+                        }
+                      }}
+                      className="mt-1 w-full border border-input bg-background rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary font-medium"
+                    >
+                      <option value="">Select Logistics Person</option>
+                      {logisticsUsers.map((u: any) => (
+                        <option key={u._id} value={u._id}>
+                          {u.firstName} {u.lastName} ({u.email})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="font-medium text-sm">
+                      {order.assignedLogisticsId
+                        ? `${order.assignedLogisticsId.firstName || ""} ${order.assignedLogisticsId.lastName || ""}`.trim() || order.assignedLogisticsId.email || "Assigned"
+                        : "Not Assigned"}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Delivery Location</p>
@@ -1130,6 +1197,11 @@ function OrderDetail() {
                                   <span className="bg-gray-100 text-gray-800 text-[10px] px-2 py-0.5 rounded font-bold border border-gray-200">Not Req.</span>
                                 )}
                               </div>
+                              {!disp.isFreightApproved && disp.remarks && (
+                                <div className="mt-1 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded p-1 max-w-[150px] break-words">
+                                  <strong>MD Reject:</strong> {disp.remarks}
+                                </div>
+                              )}
                               <div className="mt-1.5 text-[10px] space-y-1">
                                 <div className="text-muted-foreground font-semibold">Payment Status:</div>
                                 {disp.transporterPaymentStatus === "PAID" ? (
@@ -1203,12 +1275,23 @@ function OrderDetail() {
                               {disp.status !== "DELIVERED" && disp.status !== "FREIGHT_APPROVAL_PENDING" && (
                                 <div className="flex justify-end gap-1.5">
                                   {disp.status === "PLANNED" && (
-                                    <button
-                                      onClick={() => updateDispatchStatusMutation.mutate({ dispatchId: disp._id, status: "DISPATCHED" })}
-                                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded font-semibold"
-                                    >
-                                      Dispatch
-                                    </button>
+                                    <>
+                                      {disp.isFreightApproved ? (
+                                        <button
+                                          onClick={() => updateDispatchStatusMutation.mutate({ dispatchId: disp._id, status: "DISPATCHED" })}
+                                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded font-semibold"
+                                        >
+                                          Dispatch
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => updateDispatchStatusMutation.mutate({ dispatchId: disp._id, status: "FREIGHT_APPROVAL_PENDING" })}
+                                          className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-2 py-1 rounded font-semibold animate-pulse"
+                                        >
+                                          Send for Freight Approval
+                                        </button>
+                                      )}
+                                    </>
                                   )}
                                   {(disp.status === "DISPATCHED" || disp.status === "IN_TRANSIT") && (
                                     <button

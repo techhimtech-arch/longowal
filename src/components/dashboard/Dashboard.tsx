@@ -1,8 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import api from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { useMemo } from "react";
 
 export function Dashboard() {
+  const { user } = useAuth();
+  const normalizedRole = (user?.role || "").toLowerCase().replace(/[\s_-]/g, "");
+  const isSuperAdminOrAdmin = normalizedRole === "superadmin" || normalizedRole === "admin";
+  const isMD = normalizedRole === "md" || normalizedRole === "cmd" || normalizedRole === "managingdirector";
+  const isSalesExecutive = normalizedRole === "salesexecutive" || normalizedRole === "sales" || normalizedRole === "orgadmin";
+  const isLogistics = normalizedRole === "logistics" || normalizedRole === "logisticsteam";
+  const isAccounts = normalizedRole === "accounts" || normalizedRole === "citizen" || normalizedRole === "accountant";
+
   // Query all data for calculating real KPIs
   const { data: ordersRes, isLoading: isLoadingOrders } = useQuery({
     queryKey: ["orders"],
@@ -44,7 +54,16 @@ export function Dashboard() {
     }
   });
 
-  const isLoading = isLoadingOrders || isLoadingInvoices || isLoadingCustomers || isLoadingLeads || isLoadingPayments;
+  const { data: dispatchesRes, isLoading: isLoadingDispatches } = useQuery({
+    queryKey: ["dispatches"],
+    queryFn: async () => {
+      const res = await api.get("/dispatches");
+      return res.data?.data || [];
+    },
+    enabled: isLogistics || isSuperAdminOrAdmin || isMD
+  });
+
+  const isLoading = isLoadingOrders || isLoadingInvoices || isLoadingCustomers || isLoadingLeads || isLoadingPayments || (isLoadingDispatches && (isLogistics || isSuperAdminOrAdmin || isMD));
 
   if (isLoading) {
     return (
@@ -60,38 +79,242 @@ export function Dashboard() {
   const customers = customersRes || [];
   const leads = leadsRes || [];
   const payments = paymentsRes || [];
+  const dispatches = dispatchesRes || [];
 
   // Calculations & Fallbacks based on data presence
-  const hasInvoices = invoices.length > 0;
-  const hasCustomers = customers.length > 0;
-  const hasOrders = orders.length > 0;
-  const hasPayments = payments.length > 0;
-  const hasLeads = leads.length > 0;
-
-  const totalRevenueVal = invoices.reduce((acc: number, curr: any) => acc + (curr.invoiceAmount || 0), 0);
-  const totalRevenue = hasInvoices ? `₹${totalRevenueVal.toLocaleString("en-IN")}` : "₹48,25,000";
-
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
+
+  // ----------------------------------------------------
+  // SALES EXECUTIVE DASHBOARD VIEW
+  // ----------------------------------------------------
+  if (isSalesExecutive) {
+    const myOrdersIds = new Set(orders.map((o: any) => o._id.toString()));
+    const myInvoices = invoices.filter((inv: any) => myOrdersIds.has(inv.orderId?._id?.toString() || inv.orderId?.toString() || ""));
+    
+    const totalRevenueVal = myInvoices.reduce((acc: number, curr: any) => acc + (curr.invoiceAmount || 0), 0);
+    const monthlyRevenueVal = myInvoices
+      .filter((inv: any) => {
+        const d = new Date(inv.createdAt);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      })
+      .reduce((acc: number, curr: any) => acc + (curr.invoiceAmount || 0), 0);
+    const outstandingVal = myInvoices.reduce((acc: number, curr: any) => acc + (curr.outstandingAmount || 0), 0);
+    const activeOrdersVal = orders.filter((o: any) => !["DELIVERED", "COMPLETED", "CANCELLED"].includes(o.status)).length;
+
+    return (
+      <div className="p-gutter space-y-gutter">
+        <div>
+          <h1 className="font-headline-lg text-headline-lg text-primary">Sales Executive Dashboard</h1>
+          <p className="font-body-md text-body-md text-secondary">
+            Your performance and assigned order pipeline for {new Date().toLocaleString("default", { month: "short", year: "numeric" })}.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">My Active Orders</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1">{activeOrdersVal}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Awaiting completion</p>
+          </div>
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Total Sales Generated</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1">₹{totalRevenueVal.toLocaleString("en-IN")}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Cumulative value of invoices</p>
+          </div>
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Sales MTD</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1">₹{monthlyRevenueVal.toLocaleString("en-IN")}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">This calendar month</p>
+          </div>
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">My Outstanding Collections</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1 text-red-600">₹{outstandingVal.toLocaleString("en-IN")}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Unpaid buyer invoices</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <RecentOrders data={orders} />
+          <UpcomingPayments orders={orders} />
+        </div>
+      </div>
+    );
+  }
+
+  // ----------------------------------------------------
+  // LOGISTICS TEAM DASHBOARD VIEW
+  // ----------------------------------------------------
+  if (isLogistics) {
+    const activeAssigned = orders.filter((o: any) => ["APPROVED", "LOGISTICS_PENDING", "FREIGHT_APPROVAL_PENDING", "DISPATCH_READY", "PACKED", "SHIPPED"].includes(o.status));
+    
+    // Dispatches planned/draft
+    const plannedTrips = dispatches.filter((d: any) => d.status === "PLANNED");
+    const pendingFreight = dispatches.filter((d: any) => d.status === "FREIGHT_APPROVAL_PENDING");
+    const activeTransit = dispatches.filter((d: any) => ["DISPATCHED", "IN_TRANSIT"].includes(d.status));
+
+    return (
+      <div className="p-gutter space-y-gutter">
+        <div>
+          <h1 className="font-headline-lg text-headline-lg text-primary">Logistics Dashboard</h1>
+          <p className="font-body-md text-body-md text-secondary">
+            Trips planning, dispatches, and freight approval logs.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Active Assigned Orders</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1">{activeAssigned.length}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Orders awaiting dispatches</p>
+          </div>
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Planned Trips</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1">{plannedTrips.length}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Ready to dispatch</p>
+          </div>
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Freight Pending Approval</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1 text-yellow-600">{pendingFreight.length}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Awaiting MD response</p>
+          </div>
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">In-Transit Deliveries</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1 text-blue-600">{activeTransit.length}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Vehicles currently on road</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <RecentOrders data={orders} />
+          
+          <TableCard title="Your Trips Today" icon="local_shipping">
+            <div className="p-4 space-y-4">
+              {dispatches.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No dispatches recorded.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b border-wireframe-border font-bold text-muted-foreground text-xs">
+                        <th className="py-2 px-3">Vehicle #</th>
+                        <th className="py-2 px-3">Transporter</th>
+                        <th className="py-2 px-3">Status</th>
+                        <th className="py-2 px-3 text-right">Freight</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-wireframe-border">
+                      {dispatches.slice(0, 5).map((d: any) => (
+                        <tr key={d._id} className="hover:bg-wireframe-bg-alt/10">
+                          <td className="py-2 px-3">
+                            <span className="font-bold">{d.vehicleNumber}</span>
+                            <span className="block text-[10px] text-muted-foreground">{d.dispatchNumber}</span>
+                          </td>
+                          <td className="py-2 px-3">{d.transporterName || "-"}</td>
+                          <td className="py-2 px-3">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                              d.status === "DELIVERED" ? "bg-green-100 text-green-800" :
+                              d.status === "DISPATCHED" ? "bg-blue-100 text-blue-800" :
+                              d.status === "FREIGHT_APPROVAL_PENDING" ? "bg-yellow-100 text-yellow-800" :
+                              "bg-gray-100 text-gray-800"
+                            }`}>{d.status}</span>
+                          </td>
+                          <td className="py-2 px-3 text-right font-medium">₹{d.freightCost?.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </TableCard>
+        </div>
+      </div>
+    );
+  }
+
+  // ----------------------------------------------------
+  // ACCOUNTS TEAM DASHBOARD VIEW
+  // ----------------------------------------------------
+  if (isAccounts) {
+    const totalRevenueVal = invoices.reduce((acc: number, curr: any) => acc + (curr.invoiceAmount || 0), 0);
+    const outstandingVal = invoices.reduce((acc: number, curr: any) => acc + (curr.outstandingAmount || 0), 0);
+    const collectionVal = payments
+      .filter((p: any) => {
+        const d = new Date(p.paymentDate);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      })
+      .reduce((acc: number, curr: any) => acc + (curr.amountReceived || 0), 0);
+
+    const pendingInvoicesVal = invoices.filter((inv: any) => inv.status === "PENDING").length;
+
+    return (
+      <div className="p-gutter space-y-gutter">
+        <div>
+          <h1 className="font-headline-lg text-headline-lg text-primary">Accounts &amp; Collections Dashboard</h1>
+          <p className="font-body-md text-body-md text-secondary">
+            Manage customer ledgers, invoices, payments, and outstanding tracking.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Total Billing (Revenue)</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1">₹{totalRevenueVal.toLocaleString("en-IN")}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Cumulative invoices value</p>
+          </div>
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Total Outstanding</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1 text-red-600">₹{outstandingVal.toLocaleString("en-IN")}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Active outstanding balance</p>
+          </div>
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Collection (MTD)</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1 text-green-600">₹{collectionVal.toLocaleString("en-IN")}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Collected MTD payments</p>
+          </div>
+          <div className="bg-surface border border-wireframe-border p-5 rounded">
+            <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Pending Invoices</h3>
+            <p className="font-headline-md text-headline-md text-on-surface mt-1 text-yellow-600">{pendingInvoicesVal}</p>
+            <p className="font-label-sm text-label-sm text-outline mt-2">Invoices awaiting collection</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <RecentOrders data={orders} />
+          </div>
+          <div className="lg:col-span-1">
+            <PendingCollections data={invoices} />
+          </div>
+          <div className="lg:col-span-1">
+            <UpcomingPayments orders={orders} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ----------------------------------------------------
+  // MD & SUPER ADMIN MAIN DASHBOARD VIEW
+  // ----------------------------------------------------
+  const totalRevenueVal = invoices.reduce((acc: number, curr: any) => acc + (curr.invoiceAmount || 0), 0);
+  const totalRevenue = `₹${totalRevenueVal.toLocaleString("en-IN")}`;
+
   const monthlyRevenueVal = invoices
     .filter((inv: any) => {
       const d = new Date(inv.createdAt);
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     })
     .reduce((acc: number, curr: any) => acc + (curr.invoiceAmount || 0), 0);
-  const monthlyRevenue = hasInvoices ? `₹${monthlyRevenueVal.toLocaleString("en-IN")}` : "₹8,42,100";
+  const monthlyRevenue = `₹${monthlyRevenueVal.toLocaleString("en-IN")}`;
 
   const outstandingVal = invoices.reduce((acc: number, curr: any) => acc + (curr.outstandingAmount || 0), 0);
-  const outstanding = hasInvoices ? `₹${outstandingVal.toLocaleString("en-IN")}` : "₹12,80,450";
+  const outstanding = `₹${outstandingVal.toLocaleString("en-IN")}`;
 
-  const activeCustomersVal = customers.length;
-  const activeCustomers = hasCustomers ? activeCustomersVal.toString() : "1,248";
-
+  const activeCustomersVal = customers.length.toString();
   const activeOrdersVal = orders.filter((o: any) => !["DELIVERED", "COMPLETED", "CANCELLED"].includes(o.status)).length;
-  const activeOrders = hasOrders ? activeOrdersVal : 342;
-
   const dispatchesVal = orders.filter((o: any) => ["SHIPPED", "DISPATCH_READY"].includes(o.status)).length;
-  const dispatchesToday = hasOrders ? dispatchesVal : 58;
 
   const collectionVal = payments
     .filter((p: any) => {
@@ -99,10 +322,8 @@ export function Dashboard() {
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     })
     .reduce((acc: number, curr: any) => acc + (curr.amountReceived || 0), 0);
-  const collectionMtd = hasPayments ? `₹${collectionVal.toLocaleString("en-IN")}` : "₹6,20,000";
-
+  const collectionMtd = `₹${collectionVal.toLocaleString("en-IN")}`;
   const newLeadsVal = leads.filter((l: any) => l.status === "New").length;
-  const newLeads = hasLeads ? newLeadsVal : 124;
 
   return (
     <div className="p-gutter space-y-gutter">
@@ -131,12 +352,12 @@ export function Dashboard() {
         <KpiTrend icon="payments" iconBg="bg-primary-container/40" iconColor="text-primary" label="Total Revenue" value={totalRevenue} trend="12.5%" trendUp meta="Cumulative Financial Year" />
         <KpiTrend icon="event_note" iconBg="bg-secondary-container/40" iconColor="text-secondary" label="Monthly Revenue" value={monthlyRevenue} trend="8.2%" trendUp meta="Target: ₹10,00,000" />
         <KpiTrend icon="account_balance_wallet" iconBg="bg-error-container/40" iconColor="text-error" label="Outstanding Balance" value={outstanding} trend="4.1%" trendUp trendError meta="Avg. Aging: 42 Days" />
-        <KpiTrend icon="groups" iconBg="bg-surface-container-high" iconColor="text-on-surface" label="Active Customers" value={activeCustomers} trend="22" trendUp meta="Across 14 Regions" />
+        <KpiTrend icon="groups" iconBg="bg-surface-container-high" iconColor="text-on-surface" label="Active Customers" value={activeCustomersVal} trend="22" trendUp meta="Across 14 Regions" />
 
         {/* Row 2 */}
         <div className="bg-surface border border-wireframe-border p-5 rounded hover:shadow-sm transition-shadow">
           <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Active Orders</h3>
-          <p className="font-headline-md text-headline-md text-on-surface mt-1">{activeOrders}</p>
+          <p className="font-headline-md text-headline-md text-on-surface mt-1">{activeOrdersVal}</p>
           <div className="w-full bg-surface-container h-1.5 rounded-full mt-4 overflow-hidden">
             <div className="bg-primary h-full w-[65%]" />
           </div>
@@ -144,7 +365,7 @@ export function Dashboard() {
         </div>
         <div className="bg-surface border border-wireframe-border p-5 rounded hover:shadow-sm transition-shadow">
           <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">Dispatches Today</h3>
-          <p className="font-headline-md text-headline-md text-on-surface mt-1">{dispatchesToday}</p>
+          <p className="font-headline-md text-headline-md text-on-surface mt-1">{dispatchesVal}</p>
           <div className="mt-4 flex -space-x-2">
             <div className="w-6 h-6 rounded-full border-2 border-surface bg-primary-fixed" />
             <div className="w-6 h-6 rounded-full border-2 border-surface bg-secondary-fixed" />
@@ -164,7 +385,7 @@ export function Dashboard() {
         </div>
         <div className="bg-surface border border-wireframe-border p-5 rounded hover:shadow-sm transition-shadow">
           <h3 className="font-label-md text-label-md text-secondary uppercase tracking-tight">New Leads</h3>
-          <p className="font-headline-md text-headline-md text-on-surface mt-1">{newLeads}</p>
+          <p className="font-headline-md text-headline-md text-on-surface mt-1">{newLeadsVal}</p>
           <div className="flex items-center gap-2 mt-4 text-status-success">
             <span className="material-symbols-outlined text-[16px]">trending_up</span>
             <span className="font-label-sm text-label-sm">Conversion 12%</span>
@@ -337,31 +558,32 @@ function AgingTrend() {
 function TopCustomers({ data }: { data: any[] }) {
   const displayCustomers = data && data.length > 0
     ? [...data].sort((a, b) => (b.stats?.totalRevenue || 0) - (a.stats?.totalRevenue || 0)).slice(0, 4)
-    : [
-        { id: "TC", companyName: "Tata Components", customerType: "Tier 1 Partner", stats: { totalRevenue: 1240000 } },
-        { id: "RM", companyName: "Reliance Mart", customerType: "Strategic Client", stats: { totalRevenue: 890000 } },
-        { id: "JS", companyName: "JSW Steel Ltd", customerType: "Key Account", stats: { totalRevenue: 620000 } },
-        { id: "AM", companyName: "Adani Metals", customerType: "Enterprise", stats: { totalRevenue: 580000 } },
-      ];
+    : [];
 
   return (
     <TableCard title="Top Customers" icon="group">
       <table className="w-full text-left font-body-md text-body-md">
         <tbody>
-          {displayCustomers.map((r: any) => (
-            <tr key={r.id || r._id} className="border-b border-outline-variant hover:bg-surface-container-lowest">
-              <td className="p-4 flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-[10px] font-bold uppercase`}>
-                  {r.companyName ? r.companyName.charAt(0) : "C"}
-                </div>
-                <div>
-                  <p className="font-bold">{r.companyName}</p>
-                  <p className="text-[10px] text-outline">{r.customerType || "Client"}</p>
-                </div>
-              </td>
-              <td className="p-4 text-right font-medium">₹{(r.stats?.totalRevenue || 0).toLocaleString("en-IN")}</td>
+          {displayCustomers.length === 0 ? (
+            <tr>
+              <td className="p-4 text-center text-muted-foreground">No customer stats.</td>
             </tr>
-          ))}
+          ) : (
+            displayCustomers.map((r: any) => (
+              <tr key={r.id || r._id} className="border-b border-outline-variant hover:bg-surface-container-lowest">
+                <td className="p-4 flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-[10px] font-bold uppercase`}>
+                    {r.companyName ? r.companyName.charAt(0) : "C"}
+                  </div>
+                  <div>
+                    <p className="font-bold">{r.companyName}</p>
+                    <p className="text-[10px] text-outline">{r.customerType || "Client"}</p>
+                  </div>
+                </td>
+                <td className="p-4 text-right font-medium">₹{(r.stats?.totalRevenue || 0).toLocaleString("en-IN")}</td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </TableCard>
@@ -369,43 +591,55 @@ function TopCustomers({ data }: { data: any[] }) {
 }
 
 function RecentOrders({ data }: { data: any[] }) {
+  const { user } = useAuth();
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "DELIVERED": return "bg-status-success/10 text-status-success";
-      case "SHIPPED": return "bg-blue-100 text-blue-800";
-      case "APPROVED": return "bg-purple-100 text-purple-800";
-      case "DRAFT": return "bg-gray-100 text-gray-800";
-      default: return "bg-yellow-100 text-yellow-800";
+      case "DELIVERED": return "bg-status-success/10 text-status-success border border-status-success/20";
+      case "SHIPPED": return "bg-blue-100 text-blue-800 border border-blue-200";
+      case "APPROVED": return "bg-purple-100 text-purple-800 border border-purple-200";
+      case "DRAFT": return "bg-gray-100 text-gray-800 border border-gray-200";
+      default: return "bg-yellow-100 text-yellow-800 border border-yellow-200";
     }
   };
 
   const displayOrders = data && data.length > 0
     ? [...data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 4)
-    : [
-        { _id: "1", orderNumber: "#ORD-4592", createdAt: new Date(), status: "PENDING_MD_APPROVAL", totalOrderValue: 24500 },
-        { _id: "2", orderNumber: "#ORD-4591", createdAt: new Date(Date.now() - 3600000), status: "SHIPPED", totalOrderValue: 112000 },
-        { _id: "3", orderNumber: "#ORD-4590", createdAt: new Date(Date.now() - 10800000), status: "DELIVERED", totalOrderValue: 45200 },
-        { _id: "4", orderNumber: "#ORD-4589", createdAt: new Date(Date.now() - 18000000), status: "DRAFT", totalOrderValue: 9800 },
-      ];
+    : [];
 
   return (
     <TableCard title="Recent Orders" icon="shopping_bag">
       <table className="w-full text-left font-body-md text-body-md">
         <tbody>
-          {displayOrders.map((r: any) => (
-            <tr key={r._id} className="border-b border-outline-variant hover:bg-surface-container-lowest">
-              <td className="p-4">
-                <Link to={`/orders/${r._id}`} className="font-bold hover:underline hover:text-primary">
-                  {r.orderNumber}
-                </Link>
-                <p className="text-[10px] text-outline">{new Date(r.createdAt).toLocaleDateString()}</p>
-              </td>
-              <td className="p-4">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusColor(r.status)}`}>{r.status}</span>
-              </td>
-              <td className="p-4 text-right font-medium">₹{(r.totalOrderValue || 0).toLocaleString("en-IN")}</td>
+          {displayOrders.length === 0 ? (
+            <tr>
+              <td className="p-4 text-center text-muted-foreground animate-pulse">No orders found.</td>
             </tr>
-          ))}
+          ) : (
+            displayOrders.map((r: any) => {
+              const isUnread = user && r.viewedBy && !r.viewedBy.some((id: any) => id.toString() === (user.id || user._id || "").toString());
+              return (
+                <tr key={r._id} className={`border-b border-outline-variant hover:bg-surface-container-lowest transition-colors ${isUnread ? 'bg-blue-50/70' : ''}`}>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Link to={`/orders/${r._id}`} className="font-bold hover:underline hover:text-primary transition-all">
+                        {r.orderNumber}
+                      </Link>
+                      {isUnread && (
+                        <span className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase animate-pulse">
+                          New
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-outline">{new Date(r.createdAt).toLocaleDateString()}</p>
+                  </td>
+                  <td className="p-4">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusColor(r.status)}`}>{r.status}</span>
+                  </td>
+                  <td className="p-4 text-right font-medium">₹{(r.totalOrderValue || 0).toLocaleString("en-IN")}</td>
+                </tr>
+              );
+            })
+          )}
         </tbody>
       </table>
     </TableCard>
@@ -415,31 +649,32 @@ function RecentOrders({ data }: { data: any[] }) {
 function PendingCollections({ data }: { data: any[] }) {
   const displayCollections = data && data.length > 0
     ? [...data].filter((inv: any) => inv.status !== "PAID").slice(0, 4)
-    : [
-        { _id: "1", customerId: { companyName: "Bajaj Auto" }, remarks: "Overdue 12 Days", outstandingAmount: 85000 },
-        { _id: "2", customerId: { companyName: "Hero Moto" }, remarks: "Overdue 8 Days", outstandingAmount: 210000 },
-        { _id: "3", customerId: { companyName: "MRF Tyres" }, remarks: "Due in 2 Days", outstandingAmount: 45000 },
-        { _id: "4", customerId: { companyName: "Apollo Tubes" }, remarks: "Overdue 45 Days", outstandingAmount: 32000 },
-      ];
+    : [];
 
   return (
     <TableCard title="Pending Collections" icon="priority_high" iconColor="text-error">
       <table className="w-full text-left font-body-md text-body-md">
         <tbody>
-          {displayCollections.map((r: any) => (
-            <tr key={r._id} className="border-b border-outline-variant hover:bg-surface-container-lowest">
-              <td className="p-4">
-                <p className="font-bold">{r.customerId?.companyName || "Unknown Customer"}</p>
-                <p className={`text-[10px] font-semibold text-error`}>{r.remarks || "Pending Payment"}</p>
-              </td>
-              <td className="p-4 text-right font-bold text-red-600">₹{(r.outstandingAmount || 0).toLocaleString("en-IN")}</td>
-              <td className="p-4 text-right">
-                <button className="p-1 hover:bg-surface-container rounded transition-colors" title="Send Reminder">
-                  <span className="material-symbols-outlined text-outline">send</span>
-                </button>
-              </td>
+          {displayCollections.length === 0 ? (
+            <tr>
+              <td className="p-4 text-center text-muted-foreground">No pending collections.</td>
             </tr>
-          ))}
+          ) : (
+            displayCollections.map((r: any) => (
+              <tr key={r._id} className="border-b border-outline-variant hover:bg-surface-container-lowest">
+                <td className="p-4">
+                  <p className="font-bold">{r.customerId?.companyName || "Unknown Customer"}</p>
+                  <p className="text-[10px] font-semibold text-error">Invoice: {r.invoiceNumber}</p>
+                </td>
+                <td className="p-4 text-right font-bold text-red-600">₹{(r.outstandingAmount || 0).toLocaleString("en-IN")}</td>
+                <td className="p-4 text-right">
+                  <button className="p-1 hover:bg-surface-container rounded transition-colors" title="Send Reminder">
+                    <span className="material-symbols-outlined text-outline">send</span>
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </TableCard>
