@@ -2,7 +2,23 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+
+// Status color helper used in logistics dashboard
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "APPROVED": return "bg-purple-100 text-purple-800";
+    case "LOGISTICS_PENDING": return "bg-blue-100 text-blue-700";
+    case "FREIGHT_APPROVAL_PENDING": return "bg-yellow-100 text-yellow-800";
+    case "DISPATCH_READY": return "bg-indigo-100 text-indigo-800";
+    case "PACKED": return "bg-cyan-100 text-cyan-800";
+    case "SHIPPED": return "bg-blue-200 text-blue-900";
+    case "DELIVERED": return "bg-green-100 text-green-800";
+    case "REJECTED": return "bg-red-100 text-red-800";
+    case "DRAFT": return "bg-gray-100 text-gray-700";
+    default: return "bg-gray-100 text-gray-600";
+  }
+};
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -12,6 +28,9 @@ export function Dashboard() {
   const isSalesExecutive = normalizedRole === "salesexecutive" || normalizedRole === "sales" || normalizedRole === "orgadmin";
   const isLogistics = normalizedRole === "logistics" || normalizedRole === "logisticsteam";
   const isAccounts = normalizedRole === "accounts" || normalizedRole === "citizen" || normalizedRole === "accountant";
+
+  // Logistics tab state - must be at top level (React hooks rules)
+  const [activeLogisticsTab, setActiveLogisticsTab] = useState("newly_assigned");
 
   // Query all data for calculating real KPIs
   const { data: ordersRes, isLoading: isLoadingOrders } = useQuery({
@@ -153,6 +172,45 @@ export function Dashboard() {
     const pendingFreight = dispatches.filter((d: any) => d.status === "FREIGHT_APPROVAL_PENDING");
     const activeTransit = dispatches.filter((d: any) => ["DISPATCHED", "IN_TRANSIT"].includes(d.status));
 
+    // (activeLogisticsTab state is now declared at top level)
+
+    const currentUserId = user?.id || (user as any)?._id || "";
+    
+    const newlyAssigned = activeAssigned.filter((o: any) => 
+      o.viewedBy && !o.viewedBy.some((id: any) => id.toString() === currentUserId.toString())
+    );
+
+    const awaitingTripPlanning = activeAssigned.filter((o: any) => 
+      ["APPROVED", "LOGISTICS_PENDING"].includes(o.status)
+    );
+
+    const awaitingDispatch = activeAssigned.filter((o: any) => 
+      o.status === "DISPATCH_READY"
+    );
+
+    const awaitingDelivery = activeAssigned.filter((o: any) => 
+      o.status === "SHIPPED"
+    );
+
+    const highPriority = activeAssigned.filter((o: any) => {
+      const isUrgentRemark = o.remarks && /urgent|high|priority|immediate/i.test(o.remarks);
+      const isCloseDate = o.requiredDeliveryDate && new Date(o.requiredDeliveryDate).getTime() <= Date.now() + 24 * 60 * 60 * 1000;
+      return !!(isUrgentRemark || isCloseDate);
+    });
+
+    const getTabOrders = () => {
+      switch (activeLogisticsTab) {
+        case "newly_assigned": return newlyAssigned;
+        case "trip_planning": return awaitingTripPlanning;
+        case "dispatch": return awaitingDispatch;
+        case "delivery": return awaitingDelivery;
+        case "high_priority": return highPriority;
+        default: return activeAssigned;
+      }
+    };
+
+    const tabOrders = [...getTabOrders()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
     return (
       <div className="p-gutter space-y-gutter">
         <div>
@@ -185,9 +243,126 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <RecentOrders data={orders} />
+        {/* My Today's Work Section */}
+        <div className="bg-surface border border-wireframe-border rounded overflow-hidden flex flex-col">
+          <div className="p-4 bg-wireframe-bg-alt border-b border-wireframe-border flex justify-between items-center">
+            <h3 className="font-label-md text-label-md uppercase tracking-tight text-on-surface flex items-center gap-2 font-bold">
+              <span className="material-symbols-outlined text-[18px]">pending_actions</span>
+              My Today's Work / Pending Actions
+            </h3>
+            <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">
+              {activeAssigned.length} tasks assigned to me
+            </span>
+          </div>
           
+          <div className="border-b border-wireframe-border flex overflow-x-auto bg-surface-container-lowest">
+            {[
+              { id: "newly_assigned", label: "Newly Assigned", count: newlyAssigned.length },
+              { id: "trip_planning", label: "Awaiting Trip Planning", count: awaitingTripPlanning.length },
+              { id: "dispatch", label: "Awaiting Dispatch", count: awaitingDispatch.length },
+              { id: "delivery", label: "Awaiting Delivery", count: awaitingDelivery.length },
+              { id: "high_priority", label: "High Priority", count: highPriority.length }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveLogisticsTab(tab.id)}
+                className={`px-5 py-3 font-semibold text-xs whitespace-nowrap border-b-2 flex items-center gap-2 transition-all ${
+                  activeLogisticsTab === tab.id
+                    ? "border-primary text-primary bg-primary-container/5"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-wireframe-bg-alt/25"
+                }`}
+              >
+                {tab.label}
+                {tab.count > 0 && (
+                  <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                    activeLogisticsTab === tab.id ? "bg-primary text-white" : "bg-outline/20 text-outline"
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4">
+            {tabOrders.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8 italic">
+                No orders in this category.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b border-wireframe-border font-bold text-muted-foreground text-xs uppercase bg-wireframe-bg-alt/20">
+                      <th className="py-2.5 px-3">Order Details</th>
+                      <th className="py-2.5 px-3">Customer / Firm</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Loading Plant</th>
+                      <th className="py-2.5 px-3 text-right">Order Value</th>
+                      <th className="py-2.5 px-3 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-wireframe-border">
+                    {tabOrders.map((o: any) => {
+                      const isUnread = newlyAssigned.some((item: any) => item._id === o._id);
+                      const isUrgent = highPriority.some((item: any) => item._id === o._id);
+                      return (
+                        <tr key={o._id} className={`hover:bg-wireframe-bg-alt/5 transition-colors ${isUnread ? 'bg-blue-50/50' : ''}`}>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-2">
+                              <Link to={`/orders/${o._id}` as any} className="font-bold text-primary hover:underline">
+                                {o.orderNumber}
+                              </Link>
+                              {isUnread && (
+                                <span className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase animate-pulse">
+                                  New
+                                </span>
+                              )}
+                              {isUrgent && (
+                                <span className="bg-red-100 text-red-800 text-[8px] px-1.5 py-0.5 rounded font-bold uppercase border border-red-200">
+                                  Urgent
+                                </span>
+                              )}
+                            </div>
+                            <span className="block text-[10px] text-muted-foreground mt-0.5">Date: {new Date(o.orderDate || o.createdAt).toLocaleDateString()}</span>
+                            {o.requiredDeliveryDate && (
+                              <span className="block text-[10px] text-red-600 font-semibold">Req Delivery: {new Date(o.requiredDeliveryDate).toLocaleDateString()}</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-semibold block text-foreground">{o.customerId?.companyName || "-"}</span>
+                            <span className="text-[11px] text-muted-foreground">{o.executionFirmId?.firmName || "No Execution Firm"}</span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${getStatusColor(o.status)}`}>
+                              {o.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-medium text-xs">
+                            {o.plantName || "-"}
+                          </td>
+                          <td className="py-3 px-3 text-right font-semibold text-foreground">
+                            ₹{o.totalOrderValue?.toLocaleString("en-IN")}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <Link
+                              to={`/orders/${o._id}` as any}
+                              className="inline-block text-xs bg-primary text-primary-foreground font-semibold px-3 py-1 rounded hover:opacity-90 transition-all shadow-sm"
+                            >
+                              Open Details
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6">
           <TableCard title="Your Trips Today" icon="local_shipping">
             <div className="p-4 space-y-4">
               {dispatches.length === 0 ? (

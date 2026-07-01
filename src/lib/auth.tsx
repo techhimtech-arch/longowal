@@ -3,9 +3,14 @@ import api from './api';
 
 type User = {
 	id: string;
+	_id?: string;
 	name: string;
+	firstName?: string;
+	lastName?: string;
 	role?: string;
+	roleId?: string;
 	email?: string;
+	userType?: string;
 };
 
 type AuthContextType = {

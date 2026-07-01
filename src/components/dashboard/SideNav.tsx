@@ -1,5 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useAuth } from '@/lib/auth';
+import { useQuery } from '@tanstack/react-query';
+import api from '@/lib/api';
 
 interface NavItem {
   to: string;
@@ -23,6 +25,16 @@ export function SideNav({ onOpenProfile }: { onOpenProfile: () => void }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const userRole = (user?.role || '').toLowerCase().replace(/[\s_-]/g, '');
+
+  const isLogistics = userRole === "logistics" || userRole === "logisticsteam";
+  const { data: sidebarOrdersRes } = useQuery({
+    queryKey: ["sidebar-orders"],
+    queryFn: async () => {
+      const res = await api.get("/orders");
+      return res.data?.data || [];
+    },
+    enabled: isLogistics
+  });
 
   const filteredItems = NAV_ITEMS.filter(item => {
     if (item.allowedRoles.includes("*")) return true;
@@ -60,6 +72,46 @@ export function SideNav({ onOpenProfile }: { onOpenProfile: () => void }) {
             </Link>
           ))}
         </nav>
+        {isLogistics && (
+          <div className="mt-6 pt-4 border-t border-wireframe-border">
+            <div className="flex items-center justify-between mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <span>My Today's Work</span>
+              <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-[10px] font-bold">
+                {sidebarOrdersRes?.filter((o: any) => ["APPROVED", "LOGISTICS_PENDING", "FREIGHT_APPROVAL_PENDING", "DISPATCH_READY", "PACKED", "SHIPPED"].includes(o.status)).length || 0}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1 max-h-[220px] overflow-y-auto pr-1">
+              {sidebarOrdersRes?.filter((o: any) => ["APPROVED", "LOGISTICS_PENDING", "FREIGHT_APPROVAL_PENDING", "DISPATCH_READY", "PACKED", "SHIPPED"].includes(o.status)).length === 0 ? (
+                <span className="text-xs text-muted-foreground italic px-2">No pending tasks</span>
+              ) : (
+                sidebarOrdersRes
+                  ?.filter((o: any) => ["APPROVED", "LOGISTICS_PENDING", "FREIGHT_APPROVAL_PENDING", "DISPATCH_READY", "PACKED", "SHIPPED"].includes(o.status))
+                  .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                  .slice(0, 5)
+                  .map((o: any) => {
+                    const isUnread = user && o.viewedBy && !o.viewedBy.some((id: any) => id.toString() === ((user as any)._id || user.id || "").toString());
+                    return (
+                      <Link
+                        key={o._id}
+                        to={`/orders/${o._id}` as any}
+                        className="flex items-center justify-between p-2 rounded hover:bg-wireframe-bg-alt text-xs font-medium"
+                      >
+                        <div className="truncate flex items-center gap-1.5 mr-1">
+                          <span className="font-bold text-foreground">{o.orderNumber}</span>
+                          {isUnread && (
+                            <span className="h-1.5 w-1.5 bg-red-500 rounded-full inline-block" title="New Assignment"></span>
+                          )}
+                        </div>
+                        <span className="text-[9px] text-muted-foreground bg-wireframe-border/50 px-1 py-0.5 rounded uppercase font-semibold">
+                          {o.status === "LOGISTICS_PENDING" ? "PLAN" : o.status === "DISPATCH_READY" ? "READY" : o.status === "SHIPPED" ? "SHIP" : o.status}
+                        </span>
+                      </Link>
+                    );
+                  })
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="pt-4 border-t border-wireframe-border space-y-3">

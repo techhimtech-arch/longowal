@@ -546,6 +546,7 @@ function OrderDetail() {
       queryClient.invalidateQueries({ queryKey: ["order", orderId] });
     },
     onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || "Failed to update order status");
       console.error(err);
     }
   });
@@ -567,6 +568,7 @@ function OrderDetail() {
       queryClient.invalidateQueries({ queryKey: ["order", orderId] });
     },
     onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || "Failed to generate invoice");
       console.error(err);
     }
   });
@@ -597,6 +599,7 @@ function OrderDetail() {
       queryClient.invalidateQueries({ queryKey: ["order", orderId] });
     },
     onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || "Failed to record payment");
       console.error(err);
     }
   });
@@ -607,6 +610,11 @@ function OrderDetail() {
   };
 
   const submitStatusChange = () => {
+    if (targetStatus === "APPROVED" && !order?.assignedLogisticsId) {
+      toast.error("Please select an Assigned Logistics Person before confirming the order.");
+      setIsShowingStatusModal(false);
+      return;
+    }
     const payload: any = { status: targetStatus, remarks: statusRemarks };
     if (targetStatus === "REJECTED") {
       payload.materialAdjustment = {
@@ -694,7 +702,7 @@ function OrderDetail() {
             </button>
           )}
 
-          {order.status === "PENDING_MD_APPROVAL" && (isSuperAdminOrAdmin || isOperations) && (
+          {order.status === "PENDING_MD_APPROVAL" && (isSuperAdminOrAdmin || isMD || isOperations) && (
             <>
               <button
                 onClick={() => triggerStatusChange("APPROVED")}

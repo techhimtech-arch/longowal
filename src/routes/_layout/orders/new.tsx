@@ -58,6 +58,8 @@ function CreateOrder() {
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [expectedPaymentDate, setExpectedPaymentDate] = useState("");
 
+  const [assignedLogisticsId, setAssignedLogisticsId] = useState("");
+
   // Products rows
   const [products, setProducts] = useState<ProductRow[]>([
     { id: 1, productName: "", quantity: 0, unit: "tons", supplyRate: 0, freight: 0, margin: 0, gstPercent: 0, gstAmount: 0, rate: 0, total: 0 }
@@ -113,6 +115,19 @@ function CreateOrder() {
       }
     },
     enabled: canManageUsers
+  });
+
+  // Fetch Logistics Users for assignment dropdown
+  const { data: logisticsUsers = [] } = useQuery({
+    queryKey: ["users", "logistics_users"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("/users", { params: { role: "LOGISTICS_TEAM", limit: 1000 } });
+        return res.data?.data || [];
+      } catch (e) {
+        return [];
+      }
+    }
   });
 
   const handleProductChange = (index: number, field: keyof ProductRow, value: string | number) => {
@@ -208,6 +223,7 @@ function CreateOrder() {
         customerId,
         executionFirmId: executionFirmId || undefined,
         salesExecutiveId: salesExecutiveId || user?.id,
+        assignedLogisticsId: assignedLogisticsId || undefined,
         orderDate: new Date(orderDate).toISOString(),
         products: mappedProducts,
         deliveryAddress,
@@ -232,11 +248,17 @@ function CreateOrder() {
       navigate({ to: "/orders" });
     },
     onError: (error: any) => {
+      const message = error?.response?.data?.message || error?.message || "Failed to create order. Please try again.";
+      toast.error(message);
       console.error(error);
     }
   });
 
   const handleSave = (status: "DRAFT" | "PENDING_MD_APPROVAL") => {
+    if (status === "PENDING_MD_APPROVAL" && !assignedLogisticsId) {
+      toast.error("Please select an Assigned Logistics Person before confirming the order.");
+      return;
+    }
     orderMutation.mutate(status);
   };
 
@@ -268,9 +290,12 @@ function CreateOrder() {
           <button 
             onClick={() => handleSave("PENDING_MD_APPROVAL")}
             disabled={orderMutation.isPending}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium shadow disabled:opacity-75"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium shadow disabled:opacity-75 flex items-center gap-2"
           >
-            Confirm Order
+            {orderMutation.isPending && (
+              <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+            )}
+            {orderMutation.isPending ? "Confirming..." : "Confirm Order"}
           </button>
         </div>
       </div>
@@ -344,6 +369,21 @@ function CreateOrder() {
                   value={user?.name || ""}
                 />
               )}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Assigned Logistics Person *</label>
+              <select 
+                className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium"
+                value={assignedLogisticsId}
+                onChange={(e) => setAssignedLogisticsId(e.target.value)}
+              >
+                <option value="">Select Logistics Person</option>
+                {logisticsUsers.map((u: any) => (
+                  <option key={u._id} value={u._id}>
+                    {u.firstName} {u.lastName} ({u.email})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -614,6 +654,33 @@ function CreateOrder() {
               ></textarea>
             </div>
           </div>
+        </div>
+
+        {/* Bottom Actions */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-wireframe-border">
+          <Link
+            to="/orders"
+            className="px-4 py-2 border border-wireframe-border rounded-md font-medium hover:bg-wireframe-bg-alt transition-colors"
+          >
+            Cancel
+          </Link>
+          <button 
+            onClick={() => handleSave("DRAFT")}
+            disabled={orderMutation.isPending}
+            className="bg-secondary text-secondary-foreground hover:bg-secondary/90 px-4 py-2 rounded-md font-medium disabled:opacity-75"
+          >
+            Save as Draft
+          </button>
+          <button 
+            onClick={() => handleSave("PENDING_MD_APPROVAL")}
+            disabled={orderMutation.isPending}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium shadow disabled:opacity-75 flex items-center gap-2"
+          >
+            {orderMutation.isPending && (
+              <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+            )}
+            {orderMutation.isPending ? "Confirming..." : "Confirm Order"}
+          </button>
         </div>
 
       </div>
