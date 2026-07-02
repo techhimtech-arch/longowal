@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/users", label: "Users", allowedRoles: ["superadmin", "super_admin", "admin"] },
   { to: "/roles", label: "Roles", allowedRoles: ["superadmin", "super_admin", "admin"] },
   { to: "/firms", label: "Firms", allowedRoles: ["superadmin", "super_admin", "admin"] },
+  { to: "/payments", label: "Payments", allowedRoles: ["superadmin", "super_admin", "admin", "md", "managingdirector", "accounts", "citizen", "accountant"] },
   { to: "/reports", label: "Reports", allowedRoles: ["*"] },
   { to: "/masters", label: "Master Settings", allowedRoles: ["superadmin", "super_admin", "admin", "md", "managingdirector"] },
 ];

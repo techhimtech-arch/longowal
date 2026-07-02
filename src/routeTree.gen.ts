@@ -15,6 +15,7 @@ import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutUsersIndexRouteImport } from './routes/_layout/users/index'
 import { Route as LayoutRolesIndexRouteImport } from './routes/_layout/roles/index'
 import { Route as LayoutReportsIndexRouteImport } from './routes/_layout/reports/index'
+import { Route as LayoutPaymentsIndexRouteImport } from './routes/_layout/payments/index'
 import { Route as LayoutOrdersIndexRouteImport } from './routes/_layout/orders/index'
 import { Route as LayoutMastersIndexRouteImport } from './routes/_layout/masters/index'
 import { Route as LayoutLeadsIndexRouteImport } from './routes/_layout/leads/index'
@@ -57,6 +58,11 @@ const LayoutRolesIndexRoute = LayoutRolesIndexRouteImport.update({
 const LayoutReportsIndexRoute = LayoutReportsIndexRouteImport.update({
   id: '/reports/',
   path: '/reports/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutPaymentsIndexRoute = LayoutPaymentsIndexRouteImport.update({
+  id: '/payments/',
+  path: '/payments/',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutOrdersIndexRoute = LayoutOrdersIndexRouteImport.update({
@@ -145,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/leads/': typeof LayoutLeadsIndexRoute
   '/masters/': typeof LayoutMastersIndexRoute
   '/orders/': typeof LayoutOrdersIndexRoute
+  '/payments/': typeof LayoutPaymentsIndexRoute
   '/reports/': typeof LayoutReportsIndexRoute
   '/roles/': typeof LayoutRolesIndexRoute
   '/users/': typeof LayoutUsersIndexRoute
@@ -166,6 +173,7 @@ export interface FileRoutesByTo {
   '/leads': typeof LayoutLeadsIndexRoute
   '/masters': typeof LayoutMastersIndexRoute
   '/orders': typeof LayoutOrdersIndexRoute
+  '/payments': typeof LayoutPaymentsIndexRoute
   '/reports': typeof LayoutReportsIndexRoute
   '/roles': typeof LayoutRolesIndexRoute
   '/users': typeof LayoutUsersIndexRoute
@@ -189,6 +197,7 @@ export interface FileRoutesById {
   '/_layout/leads/': typeof LayoutLeadsIndexRoute
   '/_layout/masters/': typeof LayoutMastersIndexRoute
   '/_layout/orders/': typeof LayoutOrdersIndexRoute
+  '/_layout/payments/': typeof LayoutPaymentsIndexRoute
   '/_layout/reports/': typeof LayoutReportsIndexRoute
   '/_layout/roles/': typeof LayoutRolesIndexRoute
   '/_layout/users/': typeof LayoutUsersIndexRoute
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
     | '/leads/'
     | '/masters/'
     | '/orders/'
+    | '/payments/'
     | '/reports/'
     | '/roles/'
     | '/users/'
@@ -233,6 +243,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/masters'
     | '/orders'
+    | '/payments'
     | '/reports'
     | '/roles'
     | '/users'
@@ -255,6 +266,7 @@ export interface FileRouteTypes {
     | '/_layout/leads/'
     | '/_layout/masters/'
     | '/_layout/orders/'
+    | '/_layout/payments/'
     | '/_layout/reports/'
     | '/_layout/roles/'
     | '/_layout/users/'
@@ -312,6 +324,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports/'
       preLoaderRoute: typeof LayoutReportsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/payments/': {
+      id: '/_layout/payments/'
+      path: '/payments'
+      fullPath: '/payments/'
+      preLoaderRoute: typeof LayoutPaymentsIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/orders/': {
@@ -426,6 +445,7 @@ interface LayoutRouteChildren {
   LayoutLeadsIndexRoute: typeof LayoutLeadsIndexRoute
   LayoutMastersIndexRoute: typeof LayoutMastersIndexRoute
   LayoutOrdersIndexRoute: typeof LayoutOrdersIndexRoute
+  LayoutPaymentsIndexRoute: typeof LayoutPaymentsIndexRoute
   LayoutReportsIndexRoute: typeof LayoutReportsIndexRoute
   LayoutRolesIndexRoute: typeof LayoutRolesIndexRoute
   LayoutUsersIndexRoute: typeof LayoutUsersIndexRoute
@@ -447,6 +467,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutLeadsIndexRoute: LayoutLeadsIndexRoute,
   LayoutMastersIndexRoute: LayoutMastersIndexRoute,
   LayoutOrdersIndexRoute: LayoutOrdersIndexRoute,
+  LayoutPaymentsIndexRoute: LayoutPaymentsIndexRoute,
   LayoutReportsIndexRoute: LayoutReportsIndexRoute,
   LayoutRolesIndexRoute: LayoutRolesIndexRoute,
   LayoutUsersIndexRoute: LayoutUsersIndexRoute,
