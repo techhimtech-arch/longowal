@@ -11,6 +11,7 @@ export const Route = createFileRoute("/_layout/orders/")({
 function OrdersList() {
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
+  const [page, setPage] = useState(1);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -20,25 +21,18 @@ function OrdersList() {
   const canCreateOrder = !isLogistics && !isAccounts;
 
   const { data: response, isLoading, error } = useQuery({
-    queryKey: ["orders", selectedStatus],
+    queryKey: ["orders", selectedStatus, search, page],
     queryFn: async () => {
-      const params: any = {};
+      const params: any = { page, limit: 10 };
       if (selectedStatus) params.status = selectedStatus;
+      if (search) params.search = search;
       const res = await api.get("/orders", { params });
       return res.data;
     },
   });
 
   const orders = response?.data || [];
-
-  // Client-side text search (matches order number or customer name)
-  const filteredOrders = orders.filter((order: any) => {
-    const searchLower = search.toLowerCase();
-    const orderNumberMatch = (order.orderNumber || "").toLowerCase().includes(searchLower);
-    const customerNameMatch = (order.customerId?.companyName || "").toLowerCase().includes(searchLower);
-    const firmNameMatch = (order.executionFirmId?.firmName || "").toLowerCase().includes(searchLower);
-    return orderNumberMatch || customerNameMatch || firmNameMatch;
-  });
+  const pagination = response?.pagination || { total: 0, page: 1, limit: 10, pages: 1 };
 
   return (
     <div className="p-6">
@@ -64,12 +58,18 @@ function OrdersList() {
             type="text"
             placeholder="Search orders..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="border border-input bg-background rounded px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-primary"
           />
           <select 
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            onChange={(e) => {
+              setSelectedStatus(e.target.value);
+              setPage(1);
+            }}
             className="border border-input bg-background rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">All Statuses</option>
@@ -93,7 +93,7 @@ function OrdersList() {
             <div className="p-12 text-center text-red-600 font-medium">
               Error loading orders: {(error as any).message || "Unknown error"}
             </div>
-          ) : filteredOrders.length === 0 ? (
+          ) : orders.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground font-medium">
               No orders found.
             </div>
@@ -113,7 +113,7 @@ function OrdersList() {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map((order: any) => {
+                {orders.map((order: any) => {
                   const orderDate = order.orderDate
                     ? new Date(order.orderDate).toLocaleDateString()
                     : "-";
@@ -175,8 +175,27 @@ function OrdersList() {
             </table>
           )}
         </div>
-        <div className="p-4 border-t border-wireframe-border flex items-center justify-between text-sm text-muted-foreground">
-          <div>Showing {filteredOrders.length} entries</div>
+        <div className="p-4 border-t border-wireframe-border flex items-center justify-between text-sm text-muted-foreground bg-wireframe-bg-alt/30">
+          <div>Showing {orders.length} of {pagination.total} entries</div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1 bg-surface border border-wireframe-border rounded text-xs font-semibold disabled:opacity-50 hover:bg-wireframe-bg-alt transition-all"
+            >
+              Previous
+            </button>
+            <span className="px-3 py-1 text-xs font-medium text-foreground">
+              Page {page} of {pagination.pages || 1}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(pagination.pages || 1, p + 1))}
+              disabled={page >= (pagination.pages || 1)}
+              className="px-3 py-1 bg-surface border border-wireframe-border rounded text-xs font-semibold disabled:opacity-50 hover:bg-wireframe-bg-alt transition-all"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
     </div>

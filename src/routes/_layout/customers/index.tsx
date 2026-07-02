@@ -11,38 +11,42 @@ function CustomersList() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
 
-  const { data: customersRes, isLoading, error } = useQuery({
-    queryKey: ["customers"],
+  // Fetch paginated data
+  const { data: response, isLoading, error } = useQuery({
+    queryKey: ["customers", statusFilter, categoryFilter, search, page],
+    queryFn: async () => {
+      const params: any = { page, limit: 10 };
+      if (statusFilter) params.status = statusFilter;
+      if (categoryFilter) params.customerCategory = categoryFilter;
+      if (search) params.search = search;
+      const res = await api.get("/customers", { params });
+      return res.data;
+    }
+  });
+
+  // Fetch all customers for global KPI aggregates and filter parameters
+  const { data: allCustomersRes } = useQuery({
+    queryKey: ["customers-all-stats"],
     queryFn: async () => {
       const res = await api.get("/customers");
       return res.data?.data || [];
     }
   });
 
-  const customersList = customersRes || [];
-
-  // Filter customers locally based on UI state
-  const filteredCustomers = customersList.filter((cust: any) => {
-    const matchesSearch = 
-      cust.companyName?.toLowerCase().includes(search.toLowerCase()) ||
-      cust.customerCode?.toLowerCase().includes(search.toLowerCase()) ||
-      cust.primaryContact?.name?.toLowerCase().includes(search.toLowerCase());
-
-    const matchesCategory = categoryFilter ? cust.customerCategory === categoryFilter : true;
-    const matchesStatus = statusFilter ? cust.status === statusFilter : true;
-
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  const customersList = response?.data || [];
+  const pagination = response?.pagination || { total: 0, page: 1, limit: 10, pages: 1 };
+  const allCustomers = allCustomersRes || [];
 
   // Calculate high level KPIs
-  const totalCustomers = customersList.length;
-  const totalOutstanding = customersList.reduce((acc: number, curr: any) => acc + (curr.stats?.outstandingAmount || 0), 0);
-  const totalRevenue = customersList.reduce((acc: number, curr: any) => acc + (curr.stats?.totalRevenue || 0), 0);
-  const totalOrders = customersList.reduce((acc: number, curr: any) => acc + (curr.stats?.totalOrders || 0), 0);
+  const totalCustomers = allCustomers.length;
+  const totalOutstanding = allCustomers.reduce((acc: number, curr: any) => acc + (curr.stats?.outstandingAmount || 0), 0);
+  const totalRevenue = allCustomers.reduce((acc: number, curr: any) => acc + (curr.stats?.totalRevenue || 0), 0);
+  const totalOrders = allCustomers.reduce((acc: number, curr: any) => acc + (curr.stats?.totalOrders || 0), 0);
 
   // Extract unique categories for filter dropdown
-  const categories = Array.from(new Set(customersList.map((c: any) => c.customerCategory).filter(Boolean)));
+  const categories = Array.from(new Set(allCustomers.map((c: any) => c.customerCategory).filter(Boolean)));
 
   return (
     <div className="p-6 space-y-6">
@@ -88,13 +92,19 @@ function CustomersList() {
               type="text"
               placeholder="Search by company name, customer code, or contact person..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="border border-input bg-background rounded pl-10 pr-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <select 
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setPage(1);
+            }}
             className="border border-input bg-background rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary min-w-[150px]"
           >
             <option value="">All Categories</option>
@@ -104,7 +114,10 @@ function CustomersList() {
           </select>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
             className="border border-input bg-background rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary min-w-[150px]"
           >
             <option value="">All Statuses</option>
@@ -124,9 +137,9 @@ function CustomersList() {
             <div className="p-12 text-center text-red-600 font-medium">
               Error loading customers: {(error as any).message || "Unknown error"}
             </div>
-          ) : filteredCustomers.length === 0 ? (
+          ) : customersList.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground font-medium">
-              No customers found matching the search criteria.
+              No customers found.
             </div>
           ) : (
             <table className="w-full text-sm text-left">
@@ -143,7 +156,7 @@ function CustomersList() {
                 </tr>
               </thead>
               <tbody>
-                {filteredCustomers.map((cust: any) => {
+                {customersList.map((cust: any) => {
                   const isActive = cust.status === "ACTIVE";
 
                   return (
@@ -190,7 +203,26 @@ function CustomersList() {
           )}
         </div>
         <div className="p-4 border-t border-wireframe-border flex items-center justify-between text-sm text-muted-foreground bg-wireframe-bg-alt/20">
-          <div>Showing {filteredCustomers.length} of {totalCustomers} customers</div>
+          <div>Showing {customersList.length} of {pagination.total} customers</div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1 bg-surface border border-wireframe-border rounded text-xs font-semibold disabled:opacity-50 hover:bg-wireframe-bg-alt transition-all"
+            >
+              Previous
+            </button>
+            <span className="px-3 py-1 text-xs font-medium text-foreground">
+              Page {page} of {pagination.pages || 1}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(pagination.pages || 1, p + 1))}
+              disabled={page >= (pagination.pages || 1)}
+              className="px-3 py-1 bg-surface border border-wireframe-border rounded text-xs font-semibold disabled:opacity-50 hover:bg-wireframe-bg-alt transition-all"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
     </div>
