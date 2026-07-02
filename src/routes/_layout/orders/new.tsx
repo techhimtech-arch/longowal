@@ -53,7 +53,9 @@ function CreateOrder() {
   const [dispatchLocation, setDispatchLocation] = useState("");
   const [plantName, setPlantName] = useState("");
   const [requiredDeliveryDate, setRequiredDeliveryDate] = useState("");
-  const [estimatedFreight, setEstimatedFreight] = useState<number | "">("");
+  const estimatedFreight = useMemo(() => {
+    return products.reduce((acc, curr) => acc + (Number(curr.freight) || 0), 0);
+  }, [products]);
   const [remarks, setRemarks] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [expectedPaymentDate, setExpectedPaymentDate] = useState("");
@@ -201,7 +203,7 @@ function CreateOrder() {
     if (field === "salesExecutiveId" && !value) error = "Please select a Sales Executive.";
     if (field === "deliveryAddress" && !value) error = "Please enter the Delivery Address.";
     if (field === "dispatchLocation" && !value) error = "Please enter the Dispatch Location.";
-    if (field === "estimatedFreight" && (value === "" || value === null || String(value) === "")) error = "Please enter the Estimated Freight.";
+
     if (field === "expectedPaymentDate" && !value) error = "Expected Payment Date is required.";
     
     setErrors(prev => ({ ...prev, [field]: error }));
@@ -237,7 +239,7 @@ function CreateOrder() {
     // Section 3
     if (!deliveryAddress) { newErrors.deliveryAddress = "Please complete all Delivery & Dispatch Information."; isValid = false; }
     if (!dispatchLocation) { newErrors.dispatchLocation = "Please complete all Delivery & Dispatch Information."; isValid = false; }
-    if (estimatedFreight === undefined || estimatedFreight === null || String(estimatedFreight) === "") { newErrors.estimatedFreight = "Please complete all Delivery & Dispatch Information."; isValid = false; }
+
 
     // Section 4
     if (!expectedPaymentDate) { newErrors.expectedPaymentDate = "Expected Payment Date is required."; isValid = false; }
@@ -686,17 +688,7 @@ function CreateOrder() {
                   />
                 </div>
               )}
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Estimated Freight (₹) *</label>
-                <input 
-                  type="number" 
-                  className={`w-full border ${errors.estimatedFreight ? "border-red-500 focus:ring-red-500" : "border-input"} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
-                  placeholder="0"
-                  value={estimatedFreight || ""}
-                  onChange={(e) => setEstimatedFreight(Number(e.target.value))}
-                  onBlur={(e) => handleBlur("estimatedFreight", e.target.value)}
-                />
-              </div>
+
             </div>
           </div>
         </div>
