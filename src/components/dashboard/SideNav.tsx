@@ -12,10 +12,12 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard", allowedRoles: ["*"] },
   { to: "/orders", label: "Orders", allowedRoles: ["*"] },
+  { to: "/customers", label: "Customers", allowedRoles: ["*"] },
   { to: "/leads", label: "Leads", allowedRoles: ["superadmin", "super_admin", "admin", "orgadmin", "sales executive", "sales"] },
   { to: "/users", label: "Users", allowedRoles: ["superadmin", "super_admin", "admin"] },
   { to: "/roles", label: "Roles", allowedRoles: ["superadmin", "super_admin", "admin"] },
   { to: "/firms", label: "Firms", allowedRoles: ["superadmin", "super_admin", "admin"] },
+  { to: "/reports", label: "Reports", allowedRoles: ["*"] },
   { to: "/masters", label: "Master Settings", allowedRoles: ["superadmin", "super_admin", "admin", "md", "managingdirector"] },
 ];
 

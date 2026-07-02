@@ -14,16 +14,19 @@ import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutUsersIndexRouteImport } from './routes/_layout/users/index'
 import { Route as LayoutRolesIndexRouteImport } from './routes/_layout/roles/index'
+import { Route as LayoutReportsIndexRouteImport } from './routes/_layout/reports/index'
 import { Route as LayoutOrdersIndexRouteImport } from './routes/_layout/orders/index'
 import { Route as LayoutMastersIndexRouteImport } from './routes/_layout/masters/index'
 import { Route as LayoutLeadsIndexRouteImport } from './routes/_layout/leads/index'
 import { Route as LayoutFirmsIndexRouteImport } from './routes/_layout/firms/index'
+import { Route as LayoutCustomersIndexRouteImport } from './routes/_layout/customers/index'
 import { Route as LayoutUsersNewRouteImport } from './routes/_layout/users/new'
 import { Route as LayoutOrdersNewRouteImport } from './routes/_layout/orders/new'
 import { Route as LayoutLeadsNewRouteImport } from './routes/_layout/leads/new'
 import { Route as LayoutFirmsNewRouteImport } from './routes/_layout/firms/new'
 import { Route as LayoutOrdersOrderIdIndexRouteImport } from './routes/_layout/orders/$orderId/index'
 import { Route as LayoutLeadsLeadIdIndexRouteImport } from './routes/_layout/leads/$leadId/index'
+import { Route as LayoutCustomersCustomerIdIndexRouteImport } from './routes/_layout/customers/$customerId/index'
 import { Route as LayoutLeadsLeadIdFollowupRouteImport } from './routes/_layout/leads/$leadId/followup'
 import { Route as LayoutFirmsFirmIdEditRouteImport } from './routes/_layout/firms/$firmId/edit'
 
@@ -51,6 +54,11 @@ const LayoutRolesIndexRoute = LayoutRolesIndexRouteImport.update({
   path: '/roles/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutReportsIndexRoute = LayoutReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutOrdersIndexRoute = LayoutOrdersIndexRouteImport.update({
   id: '/orders/',
   path: '/orders/',
@@ -69,6 +77,11 @@ const LayoutLeadsIndexRoute = LayoutLeadsIndexRouteImport.update({
 const LayoutFirmsIndexRoute = LayoutFirmsIndexRouteImport.update({
   id: '/firms/',
   path: '/firms/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutCustomersIndexRoute = LayoutCustomersIndexRouteImport.update({
+  id: '/customers/',
+  path: '/customers/',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutUsersNewRoute = LayoutUsersNewRouteImport.update({
@@ -102,6 +115,12 @@ const LayoutLeadsLeadIdIndexRoute = LayoutLeadsLeadIdIndexRouteImport.update({
   path: '/leads/$leadId/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutCustomersCustomerIdIndexRoute =
+  LayoutCustomersCustomerIdIndexRouteImport.update({
+    id: '/customers/$customerId/',
+    path: '/customers/$customerId/',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutLeadsLeadIdFollowupRoute =
   LayoutLeadsLeadIdFollowupRouteImport.update({
     id: '/leads/$leadId/followup',
@@ -121,14 +140,17 @@ export interface FileRoutesByFullPath {
   '/leads/new': typeof LayoutLeadsNewRoute
   '/orders/new': typeof LayoutOrdersNewRoute
   '/users/new': typeof LayoutUsersNewRoute
+  '/customers/': typeof LayoutCustomersIndexRoute
   '/firms/': typeof LayoutFirmsIndexRoute
   '/leads/': typeof LayoutLeadsIndexRoute
   '/masters/': typeof LayoutMastersIndexRoute
   '/orders/': typeof LayoutOrdersIndexRoute
+  '/reports/': typeof LayoutReportsIndexRoute
   '/roles/': typeof LayoutRolesIndexRoute
   '/users/': typeof LayoutUsersIndexRoute
   '/firms/$firmId/edit': typeof LayoutFirmsFirmIdEditRoute
   '/leads/$leadId/followup': typeof LayoutLeadsLeadIdFollowupRoute
+  '/customers/$customerId/': typeof LayoutCustomersCustomerIdIndexRoute
   '/leads/$leadId/': typeof LayoutLeadsLeadIdIndexRoute
   '/orders/$orderId/': typeof LayoutOrdersOrderIdIndexRoute
 }
@@ -139,14 +161,17 @@ export interface FileRoutesByTo {
   '/leads/new': typeof LayoutLeadsNewRoute
   '/orders/new': typeof LayoutOrdersNewRoute
   '/users/new': typeof LayoutUsersNewRoute
+  '/customers': typeof LayoutCustomersIndexRoute
   '/firms': typeof LayoutFirmsIndexRoute
   '/leads': typeof LayoutLeadsIndexRoute
   '/masters': typeof LayoutMastersIndexRoute
   '/orders': typeof LayoutOrdersIndexRoute
+  '/reports': typeof LayoutReportsIndexRoute
   '/roles': typeof LayoutRolesIndexRoute
   '/users': typeof LayoutUsersIndexRoute
   '/firms/$firmId/edit': typeof LayoutFirmsFirmIdEditRoute
   '/leads/$leadId/followup': typeof LayoutLeadsLeadIdFollowupRoute
+  '/customers/$customerId': typeof LayoutCustomersCustomerIdIndexRoute
   '/leads/$leadId': typeof LayoutLeadsLeadIdIndexRoute
   '/orders/$orderId': typeof LayoutOrdersOrderIdIndexRoute
 }
@@ -159,14 +184,17 @@ export interface FileRoutesById {
   '/_layout/leads/new': typeof LayoutLeadsNewRoute
   '/_layout/orders/new': typeof LayoutOrdersNewRoute
   '/_layout/users/new': typeof LayoutUsersNewRoute
+  '/_layout/customers/': typeof LayoutCustomersIndexRoute
   '/_layout/firms/': typeof LayoutFirmsIndexRoute
   '/_layout/leads/': typeof LayoutLeadsIndexRoute
   '/_layout/masters/': typeof LayoutMastersIndexRoute
   '/_layout/orders/': typeof LayoutOrdersIndexRoute
+  '/_layout/reports/': typeof LayoutReportsIndexRoute
   '/_layout/roles/': typeof LayoutRolesIndexRoute
   '/_layout/users/': typeof LayoutUsersIndexRoute
   '/_layout/firms/$firmId/edit': typeof LayoutFirmsFirmIdEditRoute
   '/_layout/leads/$leadId/followup': typeof LayoutLeadsLeadIdFollowupRoute
+  '/_layout/customers/$customerId/': typeof LayoutCustomersCustomerIdIndexRoute
   '/_layout/leads/$leadId/': typeof LayoutLeadsLeadIdIndexRoute
   '/_layout/orders/$orderId/': typeof LayoutOrdersOrderIdIndexRoute
 }
@@ -179,14 +207,17 @@ export interface FileRouteTypes {
     | '/leads/new'
     | '/orders/new'
     | '/users/new'
+    | '/customers/'
     | '/firms/'
     | '/leads/'
     | '/masters/'
     | '/orders/'
+    | '/reports/'
     | '/roles/'
     | '/users/'
     | '/firms/$firmId/edit'
     | '/leads/$leadId/followup'
+    | '/customers/$customerId/'
     | '/leads/$leadId/'
     | '/orders/$orderId/'
   fileRoutesByTo: FileRoutesByTo
@@ -197,14 +228,17 @@ export interface FileRouteTypes {
     | '/leads/new'
     | '/orders/new'
     | '/users/new'
+    | '/customers'
     | '/firms'
     | '/leads'
     | '/masters'
     | '/orders'
+    | '/reports'
     | '/roles'
     | '/users'
     | '/firms/$firmId/edit'
     | '/leads/$leadId/followup'
+    | '/customers/$customerId'
     | '/leads/$leadId'
     | '/orders/$orderId'
   id:
@@ -216,14 +250,17 @@ export interface FileRouteTypes {
     | '/_layout/leads/new'
     | '/_layout/orders/new'
     | '/_layout/users/new'
+    | '/_layout/customers/'
     | '/_layout/firms/'
     | '/_layout/leads/'
     | '/_layout/masters/'
     | '/_layout/orders/'
+    | '/_layout/reports/'
     | '/_layout/roles/'
     | '/_layout/users/'
     | '/_layout/firms/$firmId/edit'
     | '/_layout/leads/$leadId/followup'
+    | '/_layout/customers/$customerId/'
     | '/_layout/leads/$leadId/'
     | '/_layout/orders/$orderId/'
   fileRoutesById: FileRoutesById
@@ -270,6 +307,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutRolesIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/reports/': {
+      id: '/_layout/reports/'
+      path: '/reports'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof LayoutReportsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/orders/': {
       id: '/_layout/orders/'
       path: '/orders'
@@ -296,6 +340,13 @@ declare module '@tanstack/react-router' {
       path: '/firms'
       fullPath: '/firms/'
       preLoaderRoute: typeof LayoutFirmsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/customers/': {
+      id: '/_layout/customers/'
+      path: '/customers'
+      fullPath: '/customers/'
+      preLoaderRoute: typeof LayoutCustomersIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/users/new': {
@@ -340,6 +391,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutLeadsLeadIdIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/customers/$customerId/': {
+      id: '/_layout/customers/$customerId/'
+      path: '/customers/$customerId'
+      fullPath: '/customers/$customerId/'
+      preLoaderRoute: typeof LayoutCustomersCustomerIdIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/leads/$leadId/followup': {
       id: '/_layout/leads/$leadId/followup'
       path: '/leads/$leadId/followup'
@@ -363,14 +421,17 @@ interface LayoutRouteChildren {
   LayoutLeadsNewRoute: typeof LayoutLeadsNewRoute
   LayoutOrdersNewRoute: typeof LayoutOrdersNewRoute
   LayoutUsersNewRoute: typeof LayoutUsersNewRoute
+  LayoutCustomersIndexRoute: typeof LayoutCustomersIndexRoute
   LayoutFirmsIndexRoute: typeof LayoutFirmsIndexRoute
   LayoutLeadsIndexRoute: typeof LayoutLeadsIndexRoute
   LayoutMastersIndexRoute: typeof LayoutMastersIndexRoute
   LayoutOrdersIndexRoute: typeof LayoutOrdersIndexRoute
+  LayoutReportsIndexRoute: typeof LayoutReportsIndexRoute
   LayoutRolesIndexRoute: typeof LayoutRolesIndexRoute
   LayoutUsersIndexRoute: typeof LayoutUsersIndexRoute
   LayoutFirmsFirmIdEditRoute: typeof LayoutFirmsFirmIdEditRoute
   LayoutLeadsLeadIdFollowupRoute: typeof LayoutLeadsLeadIdFollowupRoute
+  LayoutCustomersCustomerIdIndexRoute: typeof LayoutCustomersCustomerIdIndexRoute
   LayoutLeadsLeadIdIndexRoute: typeof LayoutLeadsLeadIdIndexRoute
   LayoutOrdersOrderIdIndexRoute: typeof LayoutOrdersOrderIdIndexRoute
 }
@@ -381,14 +442,17 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutLeadsNewRoute: LayoutLeadsNewRoute,
   LayoutOrdersNewRoute: LayoutOrdersNewRoute,
   LayoutUsersNewRoute: LayoutUsersNewRoute,
+  LayoutCustomersIndexRoute: LayoutCustomersIndexRoute,
   LayoutFirmsIndexRoute: LayoutFirmsIndexRoute,
   LayoutLeadsIndexRoute: LayoutLeadsIndexRoute,
   LayoutMastersIndexRoute: LayoutMastersIndexRoute,
   LayoutOrdersIndexRoute: LayoutOrdersIndexRoute,
+  LayoutReportsIndexRoute: LayoutReportsIndexRoute,
   LayoutRolesIndexRoute: LayoutRolesIndexRoute,
   LayoutUsersIndexRoute: LayoutUsersIndexRoute,
   LayoutFirmsFirmIdEditRoute: LayoutFirmsFirmIdEditRoute,
   LayoutLeadsLeadIdFollowupRoute: LayoutLeadsLeadIdFollowupRoute,
+  LayoutCustomersCustomerIdIndexRoute: LayoutCustomersCustomerIdIndexRoute,
   LayoutLeadsLeadIdIndexRoute: LayoutLeadsLeadIdIndexRoute,
   LayoutOrdersOrderIdIndexRoute: LayoutOrdersOrderIdIndexRoute,
 }
