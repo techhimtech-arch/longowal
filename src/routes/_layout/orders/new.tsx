@@ -53,9 +53,7 @@ function CreateOrder() {
   const [dispatchLocation, setDispatchLocation] = useState("");
   const [plantName, setPlantName] = useState("");
   const [requiredDeliveryDate, setRequiredDeliveryDate] = useState("");
-  const estimatedFreight = useMemo(() => {
-    return products.reduce((acc, curr) => acc + (Number(curr.freight) || 0), 0);
-  }, [products]);
+
   const [remarks, setRemarks] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [expectedPaymentDate, setExpectedPaymentDate] = useState("");
@@ -68,6 +66,10 @@ function CreateOrder() {
   const [products, setProducts] = useState<ProductRow[]>([
     { id: 1, productName: "", quantity: 0, unit: "tons", supplyRate: 0, freight: 0, margin: 0, gstPercent: 0, gstAmount: 0, rate: 0, total: 0 }
   ]);
+
+  const estimatedFreight = useMemo(() => {
+    return products.reduce((acc, curr) => acc + (Number(curr.freight) || 0), 0);
+  }, [products]);
 
   // Fetch Customers list
   const { data: customers = [] } = useQuery({
