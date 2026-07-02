@@ -21,6 +21,7 @@ function OrderDetail() {
   const isOperations = normalizedRole === "operations" || normalizedRole === "volunteer";
   const isAccounts = normalizedRole === "accounts" || normalizedRole === "citizen" || normalizedRole === "accountant";
   const isLogistics = normalizedRole === "logistics" || normalizedRole === "logisticsteam";
+  const isSalesExecutive = normalizedRole === "salesexecutive" || normalizedRole === "sales" || normalizedRole === "orgadmin";
   const [activeTab, setActiveTab] = useState("overview");
 
   // Edit Logistics form state
@@ -736,7 +737,7 @@ function OrderDetail() {
             </>
           )}
 
-          {order.status === "APPROVED" && (
+          {order.status === "APPROVED" && (isSuperAdminOrAdmin || isMD || isSalesExecutive) && (
             <button
               onClick={() => statusMutation.mutate({ status: "LOGISTICS_PENDING", remarks: "Sending to logistics desk" })}
               className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium"
@@ -1138,7 +1139,7 @@ function OrderDetail() {
                   <h3 className="font-semibold text-lg text-foreground">Vehicle Trips / Dispatches</h3>
                   <p className="text-sm text-muted-foreground">Track separate vehicle trips and their respective freights</p>
                 </div>
-                {order?.status !== "DELIVERED" && (
+                {order?.status !== "DELIVERED" && !isSalesExecutive && (
                   <button
                     onClick={() => setIsAddingDispatch(true)}
                     className="px-4 py-2 bg-primary text-primary-foreground font-semibold rounded hover:opacity-90 transition-all flex items-center gap-1.5 shadow-sm"
@@ -1280,7 +1281,7 @@ function OrderDetail() {
                               )}
 
                               {/* Logistics transition buttons */}
-                              {disp.status !== "DELIVERED" && disp.status !== "FREIGHT_APPROVAL_PENDING" && (
+                              {disp.status !== "DELIVERED" && disp.status !== "FREIGHT_APPROVAL_PENDING" && !isSalesExecutive && (
                                 <div className="flex justify-end gap-1.5">
                                   {disp.status === "PLANNED" && (
                                     <>

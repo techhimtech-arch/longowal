@@ -53,12 +53,14 @@ function CreateOrder() {
   const [dispatchLocation, setDispatchLocation] = useState("");
   const [plantName, setPlantName] = useState("");
   const [requiredDeliveryDate, setRequiredDeliveryDate] = useState("");
-  const [estimatedFreight, setEstimatedFreight] = useState(0);
+  const [estimatedFreight, setEstimatedFreight] = useState<number | "">("");
   const [remarks, setRemarks] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [expectedPaymentDate, setExpectedPaymentDate] = useState("");
 
   const [assignedLogisticsId, setAssignedLogisticsId] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
 
   // Products rows
   const [products, setProducts] = useState<ProductRow[]>([
@@ -192,6 +194,69 @@ function CreateOrder() {
     return totalOrderValue - advanceAmount;
   }, [totalOrderValue, advanceAmount]);
 
+  const validateField = (field: string, value: any) => {
+    let error = "";
+    if (field === "customerId" && !value) error = "Please select a Customer.";
+    if (field === "executionFirmId" && !value) error = "Please select an Execution Firm.";
+    if (field === "salesExecutiveId" && !value) error = "Please select a Sales Executive.";
+    if (field === "deliveryAddress" && !value) error = "Please enter the Delivery Address.";
+    if (field === "dispatchLocation" && !value) error = "Please enter the Dispatch Location.";
+    if (field === "estimatedFreight" && (value === "" || value === null || String(value) === "")) error = "Please enter the Estimated Freight.";
+    if (field === "expectedPaymentDate" && !value) error = "Expected Payment Date is required.";
+    
+    setErrors(prev => ({ ...prev, [field]: error }));
+    return !error;
+  };
+
+  const handleBlur = (field: string, value: any) => {
+    validateField(field, value);
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    let isValid = true;
+
+    // Section 1
+    if (!customerId) { newErrors.customerId = "Please select a Customer."; isValid = false; }
+    if (!executionFirmId) { newErrors.executionFirmId = "Please select an Execution Firm."; isValid = false; }
+    if (!salesExecutiveId) { newErrors.salesExecutiveId = "Please select a Sales Executive."; isValid = false; }
+    
+    // Section 2
+    let productError = false;
+    if (products.length === 0) productError = true;
+    products.forEach((p) => {
+      if (!p.productName || !p.quantity || !p.unit || p.supplyRate === undefined || p.supplyRate === null || p.freight === undefined || p.freight === null || p.margin === undefined || p.margin === null || p.gstPercent === undefined || p.gstPercent === null || p.rate === undefined || p.rate === null) {
+        productError = true;
+      }
+    });
+    if (productError) {
+      newErrors.products = "Please complete all Product Information before confirming the order.";
+      isValid = false;
+    }
+
+    // Section 3
+    if (!deliveryAddress) { newErrors.deliveryAddress = "Please complete all Delivery & Dispatch Information."; isValid = false; }
+    if (!dispatchLocation) { newErrors.dispatchLocation = "Please complete all Delivery & Dispatch Information."; isValid = false; }
+    if (estimatedFreight === undefined || estimatedFreight === null || String(estimatedFreight) === "") { newErrors.estimatedFreight = "Please complete all Delivery & Dispatch Information."; isValid = false; }
+
+    // Section 4
+    if (!expectedPaymentDate) { newErrors.expectedPaymentDate = "Expected Payment Date is required."; isValid = false; }
+
+    setErrors(newErrors);
+
+    if (!isValid) {
+      setTimeout(() => {
+        const firstErrorEl = document.querySelector('.border-red-500') as HTMLElement;
+        if (firstErrorEl) {
+          firstErrorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          firstErrorEl.focus();
+        }
+      }, 100);
+    }
+
+    return isValid;
+  };
+
   // Mutation for creating the order
   const orderMutation = useMutation({
     mutationFn: async (status: string) => {
@@ -230,7 +295,7 @@ function CreateOrder() {
         dispatchLocation,
         plantName,
         requiredDeliveryDate: requiredDeliveryDate ? new Date(requiredDeliveryDate).toISOString() : undefined,
-        estimatedFreight,
+        estimatedFreight: estimatedFreight === "" ? 0 : estimatedFreight,
         totalOrderValue,
         advanceAmount,
         balanceAmount,
@@ -259,7 +324,16 @@ function CreateOrder() {
       toast.error("Please select an Assigned Logistics Person before confirming the order.");
       return;
     }
-    orderMutation.mutate(status);
+    if (status === "PENDING_MD_APPROVAL") {
+      if (!validateForm()) {
+        toast.error("Please complete all mandatory fields.");
+        return;
+      }
+    }
+    setIsSubmittingForm(true);
+    orderMutation.mutate(status, {
+      onSettled: () => setIsSubmittingForm(false)
+    });
   };
 
   return (
@@ -282,14 +356,14 @@ function CreateOrder() {
           </Link>
           <button 
             onClick={() => handleSave("DRAFT")}
-            disabled={orderMutation.isPending}
+            disabled={orderMutation.isPending || isSubmittingForm}
             className="bg-secondary text-secondary-foreground hover:bg-secondary/90 px-4 py-2 rounded-md font-medium disabled:opacity-75"
           >
             Save as Draft
           </button>
           <button 
             onClick={() => handleSave("PENDING_MD_APPROVAL")}
-            disabled={orderMutation.isPending}
+            disabled={orderMutation.isPending || isSubmittingForm}
             className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium shadow disabled:opacity-75 flex items-center gap-2"
           >
             {orderMutation.isPending && (
@@ -319,9 +393,10 @@ function CreateOrder() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Select Customer *</label>
               <select 
-                className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className={`w-full border ${errors.customerId ? "border-red-500 focus:ring-red-500" : "border-input"} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
+                onBlur={(e) => handleBlur("customerId", e.target.value)}
               >
                 <option value="">Search Customer...</option>
                 {customers.map((c: any) => (
@@ -330,13 +405,15 @@ function CreateOrder() {
                   </option>
                 ))}
               </select>
+              {errors.customerId && <p className="text-red-500 text-xs mt-1">{errors.customerId}</p>}
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Execution Firm</label>
+              <label className="text-sm font-medium">Execution Firm *</label>
               <select 
-                className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className={`w-full border ${errors.executionFirmId ? "border-red-500 focus:ring-red-500" : "border-input"} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
                 value={executionFirmId}
                 onChange={(e) => setExecutionFirmId(e.target.value)}
+                onBlur={(e) => handleBlur("executionFirmId", e.target.value)}
               >
                 <option value="">Select Firm</option>
                 {firms.map((f: any) => (
@@ -345,14 +422,17 @@ function CreateOrder() {
                   </option>
                 ))}
               </select>
+              {errors.executionFirmId && <p className="text-red-500 text-xs mt-1">{errors.executionFirmId}</p>}
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Sales Executive</label>
+              <label className="text-sm font-medium">Sales Executive *</label>
               {canManageUsers ? (
+                <>
                 <select 
-                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={`w-full border ${errors.salesExecutiveId ? "border-red-500 focus:ring-red-500" : "border-input"} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
                   value={salesExecutiveId}
                   onChange={(e) => setSalesExecutiveId(e.target.value)}
+                  onBlur={(e) => handleBlur("salesExecutiveId", e.target.value)}
                 >
                   <option value="">Select Executive</option>
                   {users.map((u: any) => (
@@ -361,6 +441,8 @@ function CreateOrder() {
                     </option>
                   ))}
                 </select>
+              {errors.salesExecutiveId && <p className="text-red-500 text-xs mt-1">{errors.salesExecutiveId}</p>}
+                </>
               ) : (
                 <input 
                   type="text"
@@ -391,7 +473,7 @@ function CreateOrder() {
         {/* Section 2: Product Information */}
         <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm overflow-hidden">
           <div className="px-4 py-3 bg-wireframe-bg-alt/50 border-b border-wireframe-border font-medium text-primary flex justify-between items-center">
-            <span>Section 2: Product Information</span>
+            <span>Section 2: Product Information {errors.products && <span className="text-red-500 text-sm ml-4 font-bold">{errors.products}</span>}</span>
             <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold">
               Total: ₹{totalOrderValue.toLocaleString("en-IN")}
             </span>
@@ -401,15 +483,15 @@ function CreateOrder() {
               <table className="w-full text-sm text-left min-w-[900px]">
                 <thead className="bg-wireframe-bg-alt/50 border-b border-wireframe-border">
                   <tr>
-                    <th className="px-3 py-2 font-medium w-[22%]">Product</th>
-                    <th className="px-3 py-2 font-medium w-[8%]">Quantity</th>
-                    <th className="px-3 py-2 font-medium w-[10%]">Unit</th>
-                    <th className="px-3 py-2 font-medium w-[11%]">Supply Rate (₹)</th>
-                    <th className="px-3 py-2 font-medium w-[10%]">Freight (₹)</th>
-                    <th className="px-3 py-2 font-medium w-[10%]">Margin (₹)</th>
-                    <th className="px-3 py-2 font-medium w-[8%]">GST %</th>
-                    <th className="px-3 py-2 font-medium w-[11%]">Selling Rate (₹)</th>
-                    <th className="px-3 py-2 font-medium w-[10%] text-right font-semibold">Total (₹)</th>
+                    <th className="px-3 py-2 font-medium w-[22%]">Product *</th>
+                    <th className="px-3 py-2 font-medium w-[8%]">Quantity *</th>
+                    <th className="px-3 py-2 font-medium w-[10%]">Unit *</th>
+                    <th className="px-3 py-2 font-medium w-[11%]">Supply Rate (₹) *</th>
+                    <th className="px-3 py-2 font-medium w-[10%]">Freight (₹) *</th>
+                    <th className="px-3 py-2 font-medium w-[10%]">Margin (₹) *</th>
+                    <th className="px-3 py-2 font-medium w-[8%]">GST % *</th>
+                    <th className="px-3 py-2 font-medium w-[11%]">Selling Rate (₹) *</th>
+                    <th className="px-3 py-2 font-medium w-[10%] text-right font-semibold">Total (₹) *</th>
                     <th className="px-3 py-2 font-medium text-center w-8"></th>
                   </tr>
                 </thead>
@@ -557,23 +639,25 @@ function CreateOrder() {
           </div>
           <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Delivery Address</label>
+              <label className="text-sm font-medium">Delivery Address *</label>
               <textarea 
-                className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-primary" 
+                className={`w-full border ${errors.deliveryAddress ? "border-red-500 focus:ring-red-500" : "border-input"} bg-background rounded-md px-3 py-2 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-primary`} 
                 placeholder="Full delivery address..."
                 value={deliveryAddress}
                 onChange={(e) => setDeliveryAddress(e.target.value)}
+                onBlur={(e) => handleBlur("deliveryAddress", e.target.value)}
               ></textarea>
             </div>
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Dispatch Location (Plant Gate)</label>
+                <label className="text-sm font-medium">Dispatch Location (Plant Gate) *</label>
                 <input 
                   type="text" 
-                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={`w-full border ${errors.dispatchLocation ? "border-red-500 focus:ring-red-500" : "border-input"} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
                   placeholder="e.g. Factory Gate 1"
                   value={dispatchLocation}
                   onChange={(e) => setDispatchLocation(e.target.value)}
+                  onBlur={(e) => handleBlur("dispatchLocation", e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
@@ -603,13 +687,14 @@ function CreateOrder() {
                 </div>
               )}
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Estimated Freight (₹)</label>
+                <label className="text-sm font-medium">Estimated Freight (₹) *</label>
                 <input 
                   type="number" 
-                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={`w-full border ${errors.estimatedFreight ? "border-red-500 focus:ring-red-500" : "border-input"} bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
                   placeholder="0"
                   value={estimatedFreight || ""}
                   onChange={(e) => setEstimatedFreight(Number(e.target.value))}
+                  onBlur={(e) => handleBlur("estimatedFreight", e.target.value)}
                 />
               </div>
             </div>
@@ -632,9 +717,10 @@ function CreateOrder() {
                 <label className="text-sm font-medium text-primary font-bold">Expected Payment Date *</label>
                 <input 
                   type="date" 
-                  className="w-full border border-primary/30 bg-background rounded px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={`w-full border ${errors.expectedPaymentDate ? "border-red-500 focus:ring-red-500" : "border-primary/30"} bg-background rounded px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary`}
                   value={expectedPaymentDate}
                   onChange={(e) => setExpectedPaymentDate(e.target.value)}
+                  onBlur={(e) => handleBlur("expectedPaymentDate", e.target.value)}
                 />
               </div>
 
@@ -666,14 +752,14 @@ function CreateOrder() {
           </Link>
           <button 
             onClick={() => handleSave("DRAFT")}
-            disabled={orderMutation.isPending}
+            disabled={orderMutation.isPending || isSubmittingForm}
             className="bg-secondary text-secondary-foreground hover:bg-secondary/90 px-4 py-2 rounded-md font-medium disabled:opacity-75"
           >
             Save as Draft
           </button>
           <button 
             onClick={() => handleSave("PENDING_MD_APPROVAL")}
-            disabled={orderMutation.isPending}
+            disabled={orderMutation.isPending || isSubmittingForm}
             className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium shadow disabled:opacity-75 flex items-center gap-2"
           >
             {orderMutation.isPending && (
