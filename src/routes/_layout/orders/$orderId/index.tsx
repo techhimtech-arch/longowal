@@ -1100,6 +1100,23 @@ function OrderDetail() {
         {/* TAB 2: LOGISTICS */}
         {activeTab === "logistics" && (
           <div className="space-y-6">
+            {/* Route Information for Logistics */}
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-5 flex items-center gap-4 text-primary shadow-sm">
+              <span className="material-symbols-outlined text-3xl">local_shipping</span>
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-primary/70 uppercase tracking-wider mb-1">Trip Route Info</span>
+                <div className="text-lg font-bold flex items-center flex-wrap gap-2">
+                  <span className="bg-primary/10 px-2.5 py-1 rounded-md text-primary">
+                    {order?.plantName || "Plant N/A"} <span className="font-normal text-sm opacity-80">({order?.dispatchLocation || "Gate N/A"})</span>
+                  </span>
+                  <span className="material-symbols-outlined text-primary/50">arrow_forward</span>
+                  <span className="bg-primary/10 px-2.5 py-1 rounded-md text-primary">
+                    {order?.deliveryAddress || "Delivery Address N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Order Dispatch Progress Summary */}
             <div className="bg-surface border border-wireframe-border rounded-lg shadow-sm p-6">
               <h3 className="font-semibold text-lg mb-4 text-foreground">Order Dispatch Progress</h3>
@@ -1168,7 +1185,7 @@ function OrderDetail() {
                         <th className="py-3 px-4">Vehicle Details</th>
                         <th className="py-3 px-4">Transporter</th>
                         <th className="py-3 px-4">Loaded Qty</th>
-                        <th className="py-3 px-4">Freight & Status</th>
+                        <th className="py-3 px-4">Freight Details</th>
                         <th className="py-3 px-4">Trip Status</th>
                         <th className="py-3 px-4 text-right">Actions</th>
                       </tr>
@@ -1196,53 +1213,11 @@ function OrderDetail() {
                               </div>
                             </td>
                             <td className="py-3 px-4">
-                              <div className="font-semibold text-foreground">₹{disp.freightCost?.toLocaleString("en-IN")}</div>
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {disp.isFreightApproved ? (
-                                  <span className="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded font-bold border border-green-200">Approved</span>
-                                ) : disp.status === "FREIGHT_APPROVAL_PENDING" ? (
-                                  <span className="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded font-bold border border-yellow-200 animate-pulse">Pending MD</span>
-                                ) : (
-                                  <span className="bg-gray-100 text-gray-800 text-[10px] px-2 py-0.5 rounded font-bold border border-gray-200">Not Req.</span>
-                                )}
+                              <div className="text-xs text-muted-foreground mb-1">
+                                <span className="font-semibold text-foreground">Logistics New Freight:</span> ₹{disp.freightCost?.toLocaleString("en-IN") || 0}
                               </div>
-                              {!disp.isFreightApproved && disp.remarks && (
-                                <div className="mt-1 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded p-1 max-w-[150px] break-words">
-                                  <strong>MD Reject:</strong> {disp.remarks}
-                                </div>
-                              )}
-                              <div className="mt-1.5 text-[10px] space-y-1">
-                                <div className="text-muted-foreground font-semibold">Payment Status:</div>
-                                {disp.transporterPaymentStatus === "PAID" ? (
-                                  <div className="space-y-0.5">
-                                    <span className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded font-bold uppercase border border-green-200">Paid</span>
-                                    {disp.transporterPaymentProofUrl && (
-                                      <a
-                                        href={disp.transporterPaymentProofUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="block text-primary hover:underline font-semibold"
-                                      >
-                                        View Proof
-                                      </a>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div>
-                                    <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold uppercase border border-red-200">Unpaid</span>
-                                    {disp.status === "DELIVERED" && (isSuperAdminOrAdmin || isAccounts) && (
-                                      <button
-                                        onClick={() => {
-                                          setSelectedDispatchId(disp._id);
-                                          setIsRecordingTransporterPayment(true);
-                                        }}
-                                        className="block mt-1 text-[10px] text-primary font-bold hover:underline"
-                                      >
-                                        Record Payment
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
+                              <div className="text-xs text-muted-foreground">
+                                <span className="font-semibold text-foreground">Sales Estimated Freight:</span> ₹{order?.estimatedFreight?.toLocaleString("en-IN") || 0}
                               </div>
                             </td>
                             <td className="py-3 px-4">
@@ -2101,7 +2076,7 @@ function OrderDetail() {
 
               {/* Remarks */}
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Remarks / Trip Notes</label>
+                <label className="text-sm font-medium">Remarks / Trip Notes *</label>
                 <textarea
                   className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm min-h-[60px]"
                   value={newDispatchRemarks}
@@ -2132,7 +2107,7 @@ function OrderDetail() {
                     products: newDispatchProducts.map(p => ({ productName: p.productName, quantity: p.quantity })),
                     status: "FREIGHT_APPROVAL_PENDING"
                   })}
-                  disabled={createDispatchMutation.isPending || !newDispatchVehicleNumber || !newDispatchDriverName || !newDispatchDriverMobile}
+                  disabled={createDispatchMutation.isPending || !newDispatchVehicleNumber || !newDispatchDriverName || !newDispatchDriverMobile || (!newDispatchFreightCost && newDispatchFreightCost !== 0) || !newDispatchRemarks}
                   className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
                   type="button"
                 >
@@ -2152,7 +2127,7 @@ function OrderDetail() {
                     products: newDispatchProducts.map(p => ({ productName: p.productName, quantity: p.quantity })),
                     status: "PLANNED"
                   })}
-                  disabled={createDispatchMutation.isPending || !newDispatchVehicleNumber || !newDispatchDriverName || !newDispatchDriverMobile}
+                  disabled={createDispatchMutation.isPending || !newDispatchVehicleNumber || !newDispatchDriverName || !newDispatchDriverMobile || (!newDispatchFreightCost && newDispatchFreightCost !== 0) || !newDispatchRemarks}
                   className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
                   type="button"
                 >
